@@ -46,6 +46,7 @@ import type {
   IQueryCondition,
   IWaitSet,
   ISampleInfo,
+  IDataSample,
   IDataWriter,
   IDataReader,
   // ── QoS policies (§2.2.3.1 .. §2.2.3.22) ──
@@ -81,6 +82,7 @@ import type {
   IDataReaderQos,
   // ── Listeners + Status structures (§2.2.4.1 + §2.2.4.3) ──
   IQosPolicyCount,
+  IStatus,
   IInconsistentTopicStatus,
   ISampleLostStatus,
   ISampleRejectedStatus,
@@ -435,6 +437,16 @@ export const dds = {
     },
     validdata: {
       is: (s: ISampleInfo): boolean => s.validData,
+    },
+  },
+
+  // ── datasample (IDataSample §2.2.2.5.4) ──────────────────────────────────
+  datasample: {
+    info: {
+      get: (s: IDataSample): ISampleInfo => s.info,
+    },
+    data: {
+      get: (s: IDataSample): unknown => s.data,
     },
   },
 
@@ -1724,6 +1736,7 @@ export {
   QueryCondition,
   WaitSet,
   SampleInfo,
+  DataSample,
   DataWriter,
   DataReader,
   // ── QoS policies ──
@@ -1865,6 +1878,7 @@ export type {
   IQueryCondition,
   IWaitSet,
   ISampleInfo,
+  IDataSample,
   IDataWriter,
   IDataReader,
   // ── QoS policies ──
@@ -1900,6 +1914,7 @@ export type {
   IDataReaderQos,
   // ── Listeners + Status structures ──
   IQosPolicyCount,
+  IStatus,
   IInconsistentTopicStatus,
   ISampleLostStatus,
   ISampleRejectedStatus,

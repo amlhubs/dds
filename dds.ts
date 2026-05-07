@@ -1571,6 +1571,53 @@ export class SampleInfo implements ISampleInfo {
   }
 }
 
+// ─── 30b. IDataSample (§2.2.2.5.4) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.5.4
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition Per §2.2.2.5.4, a DataSample represents an atom of data
+ *   information (i.e., one value for one instance). It consists of two
+ *   parts: A SampleInfo and the Data. The SampleInfo provides per-sample
+ *   meta-information (sample/view/instance state, generation counts,
+ *   ranks, source timestamp, instance/publication handles, valid_data
+ *   flag) interpreted per §2.2.2.5.1. The Data part is the typed value
+ *   that the corresponding TypeSupport-registered topic data type
+ *   defines. The metamodel surface stays type-erased for the Data part
+ *   (`T = unknown`); concrete consumers parameterize at their own layer.
+ *   Per §2.3.2 the DataSample is intentionally NOT surfaced as a
+ *   stand-alone IDL type — DCPS read/take operations expose the pair
+ *   through parallel `data_values` and `sample_infos` sequences. The
+ *   PIM however declares DataSample as a metaclass and this surface
+ *   reflects that.
+ * @ownedAttributes
+ *   info : SampleInfo [1]
+ *   data : Data [0..1]   (typed payload; absent when valid_data == false)
+ * @associationEnds
+ *   (none declared in §2.2.2.5.4)
+ * @operations
+ *   (none declared in §2.2.2.5.4)
+ * @constraints
+ *   (none declared in §2.2.2.5.4; see §2.2.2.5.1 for per-field
+ *    SampleInfo interpretation rules that govern when the Data slot is
+ *    semantically meaningful)
+ */
+export interface IDataSample<T = unknown> {
+  readonly info: ISampleInfo;
+  readonly data: T | undefined;
+}
+
+export class DataSample<T = unknown> implements IDataSample<T> {
+  readonly metaClass = "DataSample" as const;
+  readonly info: ISampleInfo;
+  readonly data: T | undefined;
+  constructor(data: { info: ISampleInfo; data: T | undefined }) {
+    this.info = data.info;
+    this.data = data.data;
+  }
+}
+
 // ─── 31. IDataWriter (§2.2.2.4.2) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
@@ -3700,12 +3747,36 @@ export class QosPolicyCount implements IQosPolicyCount {
   }
 }
 
+// ─── 78b. Status (§2.2.2.1.5 — abstract root for all communication status objects) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.1.5
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition Status is the abstract root class for all communication
+ *   status objects. All concrete kinds of Status classes specialize this
+ *   class. Per §2.2.2.1.5, every concrete Status subtype carries the
+ *   communication-status-specific fields that are surfaced through the
+ *   listener callbacks and the `get_*_status` operations on the
+ *   corresponding Entity.
+ * @ownedAttributes
+ *   (none declared in §2.2.2.1.5; concrete subtypes declare their fields)
+ * @associationEnds
+ *   (none declared in §2.2.2.1.5)
+ * @operations
+ *   (none declared in §2.2.2.1.5)
+ * @constraints
+ *   (none declared in §2.2.2.1.5)
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IStatus { /* abstract marker; concrete subtypes carry the spec-defined fields */ }
+
 // ─── 79. InconsistentTopicStatus (§2.2.4.1) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition InconsistentTopicStatus is the plain communication status
  *   surfaced on a Topic when another Topic exists with the same name but
  *   different characteristics (i.e., its type is inconsistent with the
@@ -3725,7 +3796,7 @@ export class QosPolicyCount implements IQosPolicyCount {
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface IInconsistentTopicStatus {
+export interface IInconsistentTopicStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
 }
@@ -3745,7 +3816,7 @@ export class InconsistentTopicStatus implements IInconsistentTopicStatus {
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition SampleLostStatus is the plain communication status surfaced
  *   on a DataReader to indicate that a sample has been lost (never
  *   received). Per the §2.2.4.1 attribute table: `total_count` — total
@@ -3763,7 +3834,7 @@ export class InconsistentTopicStatus implements IInconsistentTopicStatus {
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface ISampleLostStatus {
+export interface ISampleLostStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
 }
@@ -3783,7 +3854,7 @@ export class SampleLostStatus implements ISampleLostStatus {
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition SampleRejectedStatus is the plain communication status
  *   surfaced on a DataReader when a (received) sample has been rejected.
  *   Per the §2.2.4.1 attribute table: `total_count` — total cumulative
@@ -3805,7 +3876,7 @@ export class SampleLostStatus implements ISampleLostStatus {
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface ISampleRejectedStatus {
+export interface ISampleRejectedStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
   readonly last_reason: SampleRejectedStatusKind;
@@ -3836,7 +3907,7 @@ export class SampleRejectedStatus implements ISampleRejectedStatus {
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition LivelinessLostStatus is the plain communication status
  *   surfaced on a DataWriter to indicate that the liveliness that the
  *   DataWriter has committed through its QosPolicy LIVELINESS was not
@@ -3858,7 +3929,7 @@ export class SampleRejectedStatus implements ISampleRejectedStatus {
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface ILivelinessLostStatus {
+export interface ILivelinessLostStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
 }
@@ -3878,7 +3949,7 @@ export class LivelinessLostStatus implements ILivelinessLostStatus {
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition LivelinessChangedStatus is the plain communication status
  *   surfaced on a DataReader to indicate that the liveliness of one or
  *   more DataWriter that were writing instances read through the
@@ -3916,7 +3987,7 @@ export class LivelinessLostStatus implements ILivelinessLostStatus {
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface ILivelinessChangedStatus {
+export interface ILivelinessChangedStatus extends IStatus {
   readonly alive_count: number;
   readonly not_alive_count: number;
   readonly alive_count_change: number;
@@ -3951,7 +4022,7 @@ export class LivelinessChangedStatus implements ILivelinessChangedStatus {
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition OfferedDeadlineMissedStatus is the plain communication
  *   status surfaced on a DataWriter to indicate that the deadline that the
  *   DataWriter has committed through its QosPolicy DEADLINE was not
@@ -3974,7 +4045,7 @@ export class LivelinessChangedStatus implements ILivelinessChangedStatus {
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface IOfferedDeadlineMissedStatus {
+export interface IOfferedDeadlineMissedStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
   readonly last_instance_handle: IInstanceHandle_t;
@@ -4003,7 +4074,7 @@ export class OfferedDeadlineMissedStatus
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition RequestedDeadlineMissedStatus is the plain communication
  *   status surfaced on a DataReader to indicate that the deadline that the
  *   DataReader was expecting through its QosPolicy DEADLINE was not
@@ -4027,7 +4098,7 @@ export class OfferedDeadlineMissedStatus
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface IRequestedDeadlineMissedStatus {
+export interface IRequestedDeadlineMissedStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
   readonly last_instance_handle: IInstanceHandle_t;
@@ -4056,7 +4127,7 @@ export class RequestedDeadlineMissedStatus
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition OfferedIncompatibleQosStatus is the plain communication
  *   status surfaced on a DataWriter to indicate that a QosPolicy value was
  *   incompatible with what was requested. Per the §2.2.4.1 attribute
@@ -4083,7 +4154,7 @@ export class RequestedDeadlineMissedStatus
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface IOfferedIncompatibleQosStatus {
+export interface IOfferedIncompatibleQosStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
   readonly last_policy_id: QosPolicyId_t;
@@ -4116,7 +4187,7 @@ export class OfferedIncompatibleQosStatus
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition RequestedIncompatibleQosStatus is the plain communication
  *   status surfaced on a DataReader to indicate that a QosPolicy value was
  *   incompatible with what is offered. Per the §2.2.4.1 attribute table:
@@ -4143,7 +4214,7 @@ export class OfferedIncompatibleQosStatus
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface IRequestedIncompatibleQosStatus {
+export interface IRequestedIncompatibleQosStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
   readonly last_policy_id: QosPolicyId_t;
@@ -4176,7 +4247,7 @@ export class RequestedIncompatibleQosStatus
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition PublicationMatchedStatus is the plain communication status
  *   surfaced on a DataWriter to indicate that the DataWriter has found
  *   DataReader that matches the Topic and has compatible QoS, or has
@@ -4205,7 +4276,7 @@ export class RequestedIncompatibleQosStatus
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface IPublicationMatchedStatus {
+export interface IPublicationMatchedStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
   readonly last_subscription_handle: IInstanceHandle_t;
@@ -4240,7 +4311,7 @@ export class PublicationMatchedStatus implements IPublicationMatchedStatus {
  * @standard OMG DDS 1.4 -- formal/2015-04-10
  * @section §2.2.4.1
  * @metaclass concrete
- * @generalization (root)
+ * @generalization IStatus
  * @definition SubscriptionMatchedStatus is the plain communication status
  *   surfaced on a DataReader to indicate that the DataReader has found a
  *   DataWriter that matches the Topic and has compatible QoS, or has
@@ -4269,7 +4340,7 @@ export class PublicationMatchedStatus implements IPublicationMatchedStatus {
  * @constraints
  *   (none declared in §2.2.4.1)
  */
-export interface ISubscriptionMatchedStatus {
+export interface ISubscriptionMatchedStatus extends IStatus {
   readonly total_count: number;
   readonly total_count_change: number;
   readonly last_publication_handle: IInstanceHandle_t;
@@ -4299,10 +4370,10 @@ export class SubscriptionMatchedStatus implements ISubscriptionMatchedStatus {
   }
 }
 
-// ─── 90. Listener (§2.1.4 / §2.2.4.3 — abstract marker) ───
+// ─── 90. Listener (§2.2.2.1.4 — abstract marker) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
- * @section §2.2.4.3
+ * @section §2.2.2.1.4
  * @metaclass abstract
  * @generalization (root)
  * @definition Listener is the abstract supertype of every concrete listener
@@ -4328,10 +4399,10 @@ export class SubscriptionMatchedStatus implements ISubscriptionMatchedStatus {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface IListener {}
 
-// ─── 91. TopicListener (§2.2.5.1 — listed under §2.2.4.3 Figure 2.17) ───
+// ─── 91. TopicListener (§2.2.2.3.5 — listed under §2.2.4.3 Figure 2.17) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
- * @section §2.2.5.1
+ * @section §2.2.2.3.5
  * @metaclass concrete
  * @generalization IListener
  * @definition TopicListener is the listener specialized to a Topic Entity.
@@ -4368,10 +4439,10 @@ export class TopicListener implements ITopicListener {
   }
 }
 
-// ─── 92. DataWriterListener (§2.2.4.3) ───
+// ─── 92. DataWriterListener (§2.2.2.4.4) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
- * @section §2.2.4.3
+ * @section §2.2.2.4.4
  * @metaclass concrete
  * @generalization IListener
  * @definition DataWriterListener is the listener specialized to a
@@ -4441,10 +4512,10 @@ export class DataWriterListener implements IDataWriterListener {
   }
 }
 
-// ─── 93. PublisherListener (§2.2.4.3) ───
+// ─── 93. PublisherListener (§2.2.2.4.3) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
- * @section §2.2.4.3
+ * @section §2.2.2.4.3
  * @metaclass concrete
  * @generalization IDataWriterListener
  * @definition PublisherListener is the listener specialized to a Publisher
@@ -4497,10 +4568,10 @@ export class PublisherListener implements IPublisherListener {
   }
 }
 
-// ─── 94. DataReaderListener (§2.2.4.3) ───
+// ─── 94. DataReaderListener (§2.2.2.5.7) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
- * @section §2.2.4.3
+ * @section §2.2.2.5.7
  * @metaclass concrete
  * @generalization IListener
  * @definition DataReaderListener is the listener specialized to a
@@ -4598,10 +4669,10 @@ export class DataReaderListener implements IDataReaderListener {
   }
 }
 
-// ─── 95. SubscriberListener (§2.2.4.3) ───
+// ─── 95. SubscriberListener (§2.2.2.5.6) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
- * @section §2.2.4.3
+ * @section §2.2.2.5.6
  * @metaclass concrete
  * @generalization IDataReaderListener
  * @definition SubscriberListener is the listener specialized to a
@@ -4675,10 +4746,10 @@ export class SubscriberListener implements ISubscriberListener {
   }
 }
 
-// ─── 96. DomainParticipantListener (§2.2.4.3) ───
+// ─── 96. DomainParticipantListener (§2.2.2.2.3) ───
 /**
  * @standard OMG DDS 1.4 -- formal/2015-04-10
- * @section §2.2.4.3
+ * @section §2.2.2.2.3
  * @metaclass concrete
  * @generalization ITopicListener, IPublisherListener, ISubscriberListener
  * @definition DomainParticipantListener is the listener specialized to a
