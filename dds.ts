@@ -3624,3 +3624,1649 @@ export class DataReaderQos implements IDataReaderQos {
 //     coexist.
 //     @section §2.2.3.13
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPLEMENTER #4 — Listeners + Status structures + BuiltinTopicData
+// (§2.2.4.1 Communication Status, §2.2.4.3 Access through Listeners,
+//  §2.2.5 Built-in Topics)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── 77. SampleRejectedStatusKind (§2.2.4.1 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition SampleRejectedStatusKind is the closed enumeration carried by
+ *   `SampleRejectedStatus.last_reason`. It identifies the reason a received
+ *   sample was rejected by the DataReader, or NOT_REJECTED when no rejection
+ *   has yet occurred. Per dds_dcps.idl §2.2.4.1, the four literals
+ *   correspond to: NOT_REJECTED — the special value used when no samples
+ *   have been rejected; REJECTED_BY_INSTANCES_LIMIT — the sample was
+ *   rejected because it would exceed the maximum number of instances set by
+ *   ResourceLimitsQosPolicy.max_instances; REJECTED_BY_SAMPLES_LIMIT — the
+ *   sample was rejected because it would exceed the maximum number of
+ *   samples set by ResourceLimitsQosPolicy.max_samples;
+ *   REJECTED_BY_SAMPLES_PER_INSTANCE_LIMIT — the sample was rejected
+ *   because it would exceed the maximum number of samples per instance set
+ *   by ResourceLimitsQosPolicy.max_samples_per_instance.
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export const SAMPLE_REJECTED_STATUS_KIND = {
+  NOT_REJECTED: "NOT_REJECTED",
+  REJECTED_BY_INSTANCES_LIMIT: "REJECTED_BY_INSTANCES_LIMIT",
+  REJECTED_BY_SAMPLES_LIMIT: "REJECTED_BY_SAMPLES_LIMIT",
+  REJECTED_BY_SAMPLES_PER_INSTANCE_LIMIT:
+    "REJECTED_BY_SAMPLES_PER_INSTANCE_LIMIT",
+} as const;
+export type SampleRejectedStatusKind =
+  typeof SAMPLE_REJECTED_STATUS_KIND[keyof typeof SAMPLE_REJECTED_STATUS_KIND];
+
+// ─── 78. QosPolicyCount (§2.2.4.1 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition QosPolicyCount is the simple data carrier used by
+ *   `OfferedIncompatibleQosStatus.policies` and
+ *   `RequestedIncompatibleQosStatus.policies` to record, for a given QoS
+ *   policy id, the cumulative number of times an incompatibility involving
+ *   that policy has been detected. Per dds_dcps.idl §2.2.4.1:
+ *   `struct QosPolicyCount { QosPolicyId_t policy_id; long count; };`.
+ * @ownedAttributes
+ *   policy_id : QosPolicyId_t [1]
+ *   count : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface IQosPolicyCount {
+  readonly policy_id: QosPolicyId_t;
+  readonly count: number;
+}
+
+export class QosPolicyCount implements IQosPolicyCount {
+  readonly metaClass = "QosPolicyCount" as const;
+  readonly policy_id: QosPolicyId_t;
+  readonly count: number;
+  constructor(data: { policy_id: QosPolicyId_t; count: number }) {
+    this.policy_id = data.policy_id;
+    this.count = data.count;
+  }
+}
+
+// ─── 79. InconsistentTopicStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition InconsistentTopicStatus is the plain communication status
+ *   surfaced on a Topic when another Topic exists with the same name but
+ *   different characteristics (i.e., its type is inconsistent with the
+ *   Topic to which this status is attached). Per the §2.2.4.1 attribute
+ *   table: `total_count` — total cumulative count of the Topics discovered
+ *   whose name matches the Topic to which this status is attached and
+ *   whose type is inconsistent with the Topic; `total_count_change` — the
+ *   incremental number of inconsistent topics discovered since the last
+ *   time the listener was called or the status was read.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface IInconsistentTopicStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+}
+
+export class InconsistentTopicStatus implements IInconsistentTopicStatus {
+  readonly metaClass = "InconsistentTopicStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  constructor(data: { total_count: number; total_count_change: number }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+  }
+}
+
+// ─── 80. SampleLostStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition SampleLostStatus is the plain communication status surfaced
+ *   on a DataReader to indicate that a sample has been lost (never
+ *   received). Per the §2.2.4.1 attribute table: `total_count` — total
+ *   cumulative count of all samples lost across of instances of data
+ *   published under the Topic; `total_count_change` — the incremental
+ *   number of samples lost since the last time the listener was called or
+ *   the status was read.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface ISampleLostStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+}
+
+export class SampleLostStatus implements ISampleLostStatus {
+  readonly metaClass = "SampleLostStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  constructor(data: { total_count: number; total_count_change: number }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+  }
+}
+
+// ─── 81. SampleRejectedStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition SampleRejectedStatus is the plain communication status
+ *   surfaced on a DataReader when a (received) sample has been rejected.
+ *   Per the §2.2.4.1 attribute table: `total_count` — total cumulative
+ *   count of samples rejected by the DataReader; `total_count_change` —
+ *   the incremental number of samples rejected since the last time the
+ *   listener was called or the status was read; `last_reason` — reason for
+ *   rejecting the last sample rejected, or the special value NOT_REJECTED
+ *   if no samples have been rejected; `last_instance_handle` — handle to
+ *   the instance being updated by the last sample that was rejected.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ *   last_reason : SampleRejectedStatusKind [1]
+ *   last_instance_handle : InstanceHandle_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface ISampleRejectedStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_reason: SampleRejectedStatusKind;
+  readonly last_instance_handle: IInstanceHandle_t;
+}
+
+export class SampleRejectedStatus implements ISampleRejectedStatus {
+  readonly metaClass = "SampleRejectedStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_reason: SampleRejectedStatusKind;
+  readonly last_instance_handle: IInstanceHandle_t;
+  constructor(data: {
+    total_count: number;
+    total_count_change: number;
+    last_reason: SampleRejectedStatusKind;
+    last_instance_handle: IInstanceHandle_t;
+  }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+    this.last_reason = data.last_reason;
+    this.last_instance_handle = data.last_instance_handle;
+  }
+}
+
+// ─── 82. LivelinessLostStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition LivelinessLostStatus is the plain communication status
+ *   surfaced on a DataWriter to indicate that the liveliness that the
+ *   DataWriter has committed through its QosPolicy LIVELINESS was not
+ *   respected; thus DataReader entities will consider the DataWriter as no
+ *   longer "active." Per the §2.2.4.1 attribute table: `total_count` —
+ *   total cumulative number of times that a previously-alive DataWriter
+ *   became not alive due to a failure to actively signal its liveliness
+ *   within its offered liveliness period. This count does not change when
+ *   an already not alive DataWriter simply remains not alive for another
+ *   liveliness period; `total_count_change` — the change in total_count
+ *   since the last time the listener was called or the status was read.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface ILivelinessLostStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+}
+
+export class LivelinessLostStatus implements ILivelinessLostStatus {
+  readonly metaClass = "LivelinessLostStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  constructor(data: { total_count: number; total_count_change: number }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+  }
+}
+
+// ─── 83. LivelinessChangedStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition LivelinessChangedStatus is the plain communication status
+ *   surfaced on a DataReader to indicate that the liveliness of one or
+ *   more DataWriter that were writing instances read through the
+ *   DataReader has changed. Some DataWriter have become "active" or
+ *   "inactive." Per the §2.2.4.1 attribute table: `alive_count` — the
+ *   total number of currently active DataWriters that write the Topic read
+ *   by the DataReader. This count increases when a newly matched
+ *   DataWriter asserts its liveliness for the first time or when a
+ *   DataWriter previously considered to be not alive reasserts its
+ *   liveliness. The count decreases when a DataWriter considered alive
+ *   fails to assert its liveliness and becomes not alive, whether because
+ *   it was deleted normally or for some other reason; `not_alive_count` —
+ *   the total count of currently DataWriters that write the Topic read by
+ *   the DataReader that are no longer asserting their liveliness. This
+ *   count increases when a DataWriter considered alive fails to assert its
+ *   liveliness and becomes not alive for some reason other than the
+ *   normal deletion of that DataWriter. It decreases when a previously
+ *   not alive DataWriter either reasserts its liveliness or is deleted
+ *   normally; `alive_count_change` — the change in the alive_count since
+ *   the last time the listener was called or the status was read;
+ *   `not_alive_count_change` — the change in the not_alive_count since
+ *   the last time the listener was called or the status was read;
+ *   `last_publication_handle` — handle to the last DataWriter whose change
+ *   in liveliness caused this status to change.
+ * @ownedAttributes
+ *   alive_count : long [1]
+ *   not_alive_count : long [1]
+ *   alive_count_change : long [1]
+ *   not_alive_count_change : long [1]
+ *   last_publication_handle : InstanceHandle_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface ILivelinessChangedStatus {
+  readonly alive_count: number;
+  readonly not_alive_count: number;
+  readonly alive_count_change: number;
+  readonly not_alive_count_change: number;
+  readonly last_publication_handle: IInstanceHandle_t;
+}
+
+export class LivelinessChangedStatus implements ILivelinessChangedStatus {
+  readonly metaClass = "LivelinessChangedStatus" as const;
+  readonly alive_count: number;
+  readonly not_alive_count: number;
+  readonly alive_count_change: number;
+  readonly not_alive_count_change: number;
+  readonly last_publication_handle: IInstanceHandle_t;
+  constructor(data: {
+    alive_count: number;
+    not_alive_count: number;
+    alive_count_change: number;
+    not_alive_count_change: number;
+    last_publication_handle: IInstanceHandle_t;
+  }) {
+    this.alive_count = data.alive_count;
+    this.not_alive_count = data.not_alive_count;
+    this.alive_count_change = data.alive_count_change;
+    this.not_alive_count_change = data.not_alive_count_change;
+    this.last_publication_handle = data.last_publication_handle;
+  }
+}
+
+// ─── 84. OfferedDeadlineMissedStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition OfferedDeadlineMissedStatus is the plain communication
+ *   status surfaced on a DataWriter to indicate that the deadline that the
+ *   DataWriter has committed through its QosPolicy DEADLINE was not
+ *   respected for a specific instance. Per the §2.2.4.1 attribute table:
+ *   `total_count` — total cumulative number of offered deadline periods
+ *   elapsed during which a DataWriter failed to provide data. Missed
+ *   deadlines accumulate; that is, each deadline period the total_count
+ *   will be incremented by one; `total_count_change` — the change in
+ *   total_count since the last time the listener was called or the status
+ *   was read; `last_instance_handle` — handle to the last instance in the
+ *   DataWriter for which an offered deadline was missed.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ *   last_instance_handle : InstanceHandle_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface IOfferedDeadlineMissedStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_instance_handle: IInstanceHandle_t;
+}
+
+export class OfferedDeadlineMissedStatus
+  implements IOfferedDeadlineMissedStatus
+{
+  readonly metaClass = "OfferedDeadlineMissedStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_instance_handle: IInstanceHandle_t;
+  constructor(data: {
+    total_count: number;
+    total_count_change: number;
+    last_instance_handle: IInstanceHandle_t;
+  }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+    this.last_instance_handle = data.last_instance_handle;
+  }
+}
+
+// ─── 85. RequestedDeadlineMissedStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition RequestedDeadlineMissedStatus is the plain communication
+ *   status surfaced on a DataReader to indicate that the deadline that the
+ *   DataReader was expecting through its QosPolicy DEADLINE was not
+ *   respected for a specific instance. Per the §2.2.4.1 attribute table:
+ *   `total_count` — total cumulative number of missed deadlines detected
+ *   for any instance read by the DataReader. Missed deadlines accumulate;
+ *   that is, each deadline period the total_count will be incremented by
+ *   one for each instance for which data was not received;
+ *   `total_count_change` — the incremental number of deadlines detected
+ *   since the last time the listener was called or the status was read;
+ *   `last_instance_handle` — handle to the last instance in the DataReader
+ *   for which a deadline was detected.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ *   last_instance_handle : InstanceHandle_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface IRequestedDeadlineMissedStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_instance_handle: IInstanceHandle_t;
+}
+
+export class RequestedDeadlineMissedStatus
+  implements IRequestedDeadlineMissedStatus
+{
+  readonly metaClass = "RequestedDeadlineMissedStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_instance_handle: IInstanceHandle_t;
+  constructor(data: {
+    total_count: number;
+    total_count_change: number;
+    last_instance_handle: IInstanceHandle_t;
+  }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+    this.last_instance_handle = data.last_instance_handle;
+  }
+}
+
+// ─── 86. OfferedIncompatibleQosStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition OfferedIncompatibleQosStatus is the plain communication
+ *   status surfaced on a DataWriter to indicate that a QosPolicy value was
+ *   incompatible with what was requested. Per the §2.2.4.1 attribute
+ *   table: `total_count` — total cumulative number of times the concerned
+ *   DataWriter discovered a DataReader for the same Topic with a requested
+ *   QoS that is incompatible with that offered by the DataWriter;
+ *   `total_count_change` — the change in total_count since the last time
+ *   the listener was called or the status was read; `last_policy_id` —
+ *   the PolicyId_t of one of the policies that was found to be
+ *   incompatible the last time an incompatibility was detected;
+ *   `policies` — a list containing for each policy the total number of
+ *   times that the concerned DataWriter discovered a DataReader for the
+ *   same Topic with a requested QoS that is incompatible with that offered
+ *   by the DataWriter.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ *   last_policy_id : QosPolicyId_t [1]
+ *   policies : QosPolicyCount [*]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface IOfferedIncompatibleQosStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_policy_id: QosPolicyId_t;
+  readonly policies: ReadonlyArray<IQosPolicyCount>;
+}
+
+export class OfferedIncompatibleQosStatus
+  implements IOfferedIncompatibleQosStatus
+{
+  readonly metaClass = "OfferedIncompatibleQosStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_policy_id: QosPolicyId_t;
+  readonly policies: ReadonlyArray<IQosPolicyCount>;
+  constructor(data: {
+    total_count: number;
+    total_count_change: number;
+    last_policy_id: QosPolicyId_t;
+    policies: ReadonlyArray<IQosPolicyCount>;
+  }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+    this.last_policy_id = data.last_policy_id;
+    this.policies = data.policies;
+  }
+}
+
+// ─── 87. RequestedIncompatibleQosStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition RequestedIncompatibleQosStatus is the plain communication
+ *   status surfaced on a DataReader to indicate that a QosPolicy value was
+ *   incompatible with what is offered. Per the §2.2.4.1 attribute table:
+ *   `total_count` — total cumulative number of times the concerned
+ *   DataReader discovered a DataWriter for the same Topic with an offered
+ *   QoS that was incompatible with that requested by the DataReader;
+ *   `total_count_change` — the change in total_count since the last time
+ *   the listener was called or the status was read; `last_policy_id` —
+ *   the QosPolicyId_t of one of the policies that was found to be
+ *   incompatible the last time an incompatibility was detected;
+ *   `policies` — a list containing for each policy the total number of
+ *   times that the concerned DataReader discovered a DataWriter for the
+ *   same Topic with an offered QoS that is incompatible with that
+ *   requested by the DataReader.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ *   last_policy_id : QosPolicyId_t [1]
+ *   policies : QosPolicyCount [*]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface IRequestedIncompatibleQosStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_policy_id: QosPolicyId_t;
+  readonly policies: ReadonlyArray<IQosPolicyCount>;
+}
+
+export class RequestedIncompatibleQosStatus
+  implements IRequestedIncompatibleQosStatus
+{
+  readonly metaClass = "RequestedIncompatibleQosStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_policy_id: QosPolicyId_t;
+  readonly policies: ReadonlyArray<IQosPolicyCount>;
+  constructor(data: {
+    total_count: number;
+    total_count_change: number;
+    last_policy_id: QosPolicyId_t;
+    policies: ReadonlyArray<IQosPolicyCount>;
+  }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+    this.last_policy_id = data.last_policy_id;
+    this.policies = data.policies;
+  }
+}
+
+// ─── 88. PublicationMatchedStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition PublicationMatchedStatus is the plain communication status
+ *   surfaced on a DataWriter to indicate that the DataWriter has found
+ *   DataReader that matches the Topic and has compatible QoS, or has
+ *   ceased to be matched with a DataReader that was previously considered
+ *   to be matched. Per the §2.2.4.1 attribute table: `total_count` —
+ *   total cumulative count the concerned DataWriter discovered a "match"
+ *   with a DataReader. That is, it found a DataReader for the same Topic
+ *   with a requested QoS that is compatible with that offered by the
+ *   DataWriter; `total_count_change` — the change in total_count since
+ *   the last time the listener was called or the status was read;
+ *   `last_subscription_handle` — handle to the last DataReader that
+ *   matched the DataWriter causing the status to change; `current_count`
+ *   — the number of DataReaders currently matched to the concerned
+ *   DataWriter; `current_count_change` — the change in current_count
+ *   since the last time the listener was called or the status was read.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ *   last_subscription_handle : InstanceHandle_t [1]
+ *   current_count : long [1]
+ *   current_count_change : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface IPublicationMatchedStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_subscription_handle: IInstanceHandle_t;
+  readonly current_count: number;
+  readonly current_count_change: number;
+}
+
+export class PublicationMatchedStatus implements IPublicationMatchedStatus {
+  readonly metaClass = "PublicationMatchedStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_subscription_handle: IInstanceHandle_t;
+  readonly current_count: number;
+  readonly current_count_change: number;
+  constructor(data: {
+    total_count: number;
+    total_count_change: number;
+    last_subscription_handle: IInstanceHandle_t;
+    current_count: number;
+    current_count_change: number;
+  }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+    this.last_subscription_handle = data.last_subscription_handle;
+    this.current_count = data.current_count;
+    this.current_count_change = data.current_count_change;
+  }
+}
+
+// ─── 89. SubscriptionMatchedStatus (§2.2.4.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.1
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition SubscriptionMatchedStatus is the plain communication status
+ *   surfaced on a DataReader to indicate that the DataReader has found a
+ *   DataWriter that matches the Topic and has compatible QoS, or has
+ *   ceased to be matched with a DataWriter that was previously considered
+ *   to be matched. Per the §2.2.4.1 attribute table: `total_count` —
+ *   total cumulative count the concerned DataReader discovered a "match"
+ *   with a DataWriter. That is, it found a DataWriter for the same Topic
+ *   with a requested QoS that is compatible with that offered by the
+ *   DataReader; `total_count_change` — the change in total_count since
+ *   the last time the listener was called or the status was read;
+ *   `last_publication_handle` — handle to the last DataWriter that
+ *   matched the DataReader causing the status to change; `current_count`
+ *   — the number of DataWriters currently matched to the concerned
+ *   DataReader; `current_count_change` — the change in current_count
+ *   since the last time the listener was called or the status was read.
+ * @ownedAttributes
+ *   total_count : long [1]
+ *   total_count_change : long [1]
+ *   last_publication_handle : InstanceHandle_t [1]
+ *   current_count : long [1]
+ *   current_count_change : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.4.1)
+ * @operations
+ *   (none declared in §2.2.4.1)
+ * @constraints
+ *   (none declared in §2.2.4.1)
+ */
+export interface ISubscriptionMatchedStatus {
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_publication_handle: IInstanceHandle_t;
+  readonly current_count: number;
+  readonly current_count_change: number;
+}
+
+export class SubscriptionMatchedStatus implements ISubscriptionMatchedStatus {
+  readonly metaClass = "SubscriptionMatchedStatus" as const;
+  readonly total_count: number;
+  readonly total_count_change: number;
+  readonly last_publication_handle: IInstanceHandle_t;
+  readonly current_count: number;
+  readonly current_count_change: number;
+  constructor(data: {
+    total_count: number;
+    total_count_change: number;
+    last_publication_handle: IInstanceHandle_t;
+    current_count: number;
+    current_count_change: number;
+  }) {
+    this.total_count = data.total_count;
+    this.total_count_change = data.total_count_change;
+    this.last_publication_handle = data.last_publication_handle;
+    this.current_count = data.current_count;
+    this.current_count_change = data.current_count_change;
+  }
+}
+
+// ─── 90. Listener (§2.1.4 / §2.2.4.3 — abstract marker) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.3
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition Listener is the abstract supertype of every concrete listener
+ *   interface in the DCPS API. Per §2.2.4.3, listeners provide a mechanism
+ *   for the middleware to asynchronously alert the application of the
+ *   occurrence of relevant status changes. All Entity support a listener,
+ *   the type of which is specialized to the specific type of the related
+ *   Entity (e.g., DataReaderListener for the DataReader). Listeners are
+ *   interfaces that the application must implement. Each dedicated
+ *   listener presents a list of operations that correspond to the relevant
+ *   communication status changes. Per dds_dcps.idl §2.2.4.3:
+ *   `interface Listener {};` — Listener itself declares no operations; it
+ *   is a marker interface.
+ * @ownedAttributes
+ *   (none declared in §2.2.4.3)
+ * @associationEnds
+ *   (none declared in §2.2.4.3)
+ * @operations
+ *   (none declared in §2.2.4.3)
+ * @constraints
+ *   (none declared in §2.2.4.3)
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IListener {}
+
+// ─── 91. TopicListener (§2.2.5.1 — listed under §2.2.4.3 Figure 2.17) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.5.1
+ * @metaclass concrete
+ * @generalization IListener
+ * @definition TopicListener is the listener specialized to a Topic Entity.
+ *   Per §2.2.4.3 Figure 2.17 and dds_dcps.idl, TopicListener declares the
+ *   single callback `on_inconsistent_topic` that fires when the
+ *   InconsistentTopicStatus communication status of a Topic changes. The
+ *   `the_topic` parameter is a reference to the actual concerned Entity;
+ *   the `status` parameter conveys the InconsistentTopicStatus value at
+ *   the time of the callback. Listeners are stateless, so a single
+ *   TopicListener instance MAY be shared among multiple Topic objects.
+ * @ownedAttributes
+ *   (none declared in §2.2.5.1)
+ * @associationEnds
+ *   (none declared in §2.2.5.1)
+ * @operations
+ *   on_inconsistent_topic(the_topic : Topic, status : InconsistentTopicStatus) : void
+ * @constraints
+ *   (none declared in §2.2.5.1)
+ */
+export interface ITopicListener extends IListener {
+  on_inconsistent_topic(
+    the_topic: ITopic,
+    status: IInconsistentTopicStatus
+  ): void;
+}
+
+export class TopicListener implements ITopicListener {
+  readonly metaClass = "TopicListener" as const;
+  on_inconsistent_topic(
+    _the_topic: ITopic,
+    _status: IInconsistentTopicStatus
+  ): void {
+    // default: NO-OP `nil' listener (per §2.2.4.3 default semantics)
+  }
+}
+
+// ─── 92. DataWriterListener (§2.2.4.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.3
+ * @metaclass concrete
+ * @generalization IListener
+ * @definition DataWriterListener is the listener specialized to a
+ *   DataWriter Entity. Per §2.2.4.3 Figure 2.17 and dds_dcps.idl, it
+ *   declares one callback per plain communication status that may be
+ *   surfaced on a DataWriter: on_offered_deadline_missed,
+ *   on_offered_incompatible_qos, on_liveliness_lost, on_publication_matched.
+ *   The first parameter of every callback is the reference to the
+ *   concerned DataWriter; the second is the value of the corresponding
+ *   communication status struct at the time of the callback.
+ * @ownedAttributes
+ *   (none declared in §2.2.4.3)
+ * @associationEnds
+ *   (none declared in §2.2.4.3)
+ * @operations
+ *   on_offered_deadline_missed(writer : DataWriter, status : OfferedDeadlineMissedStatus) : void
+ *   on_offered_incompatible_qos(writer : DataWriter, status : OfferedIncompatibleQosStatus) : void
+ *   on_liveliness_lost(writer : DataWriter, status : LivelinessLostStatus) : void
+ *   on_publication_matched(writer : DataWriter, status : PublicationMatchedStatus) : void
+ * @constraints
+ *   (none declared in §2.2.4.3)
+ */
+export interface IDataWriterListener extends IListener {
+  on_offered_deadline_missed(
+    writer: IDataWriter,
+    status: IOfferedDeadlineMissedStatus
+  ): void;
+  on_offered_incompatible_qos(
+    writer: IDataWriter,
+    status: IOfferedIncompatibleQosStatus
+  ): void;
+  on_liveliness_lost(
+    writer: IDataWriter,
+    status: ILivelinessLostStatus
+  ): void;
+  on_publication_matched(
+    writer: IDataWriter,
+    status: IPublicationMatchedStatus
+  ): void;
+}
+
+export class DataWriterListener implements IDataWriterListener {
+  readonly metaClass = "DataWriterListener" as const;
+  on_offered_deadline_missed(
+    _writer: IDataWriter,
+    _status: IOfferedDeadlineMissedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_offered_incompatible_qos(
+    _writer: IDataWriter,
+    _status: IOfferedIncompatibleQosStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_liveliness_lost(
+    _writer: IDataWriter,
+    _status: ILivelinessLostStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_publication_matched(
+    _writer: IDataWriter,
+    _status: IPublicationMatchedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+}
+
+// ─── 93. PublisherListener (§2.2.4.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.3
+ * @metaclass concrete
+ * @generalization IDataWriterListener
+ * @definition PublisherListener is the listener specialized to a Publisher
+ *   Entity. Per §2.2.4.3 Figure 2.17 and dds_dcps.idl
+ *   (`interface PublisherListener : DataWriterListener {};`),
+ *   PublisherListener inherits every DataWriter callback from
+ *   DataWriterListener and adds no operations of its own. The Publisher
+ *   embeds DataWriter — see §2.2.4.3.1 Figure 2.18 — so a
+ *   DataWriter-status-change callback on the PublisherListener is the
+ *   default-fallback target when the offending DataWriter does not have a
+ *   listener of its own (or has one whose corresponding callback is not
+ *   enabled in the mask).
+ * @ownedAttributes
+ *   (none declared in §2.2.4.3)
+ * @associationEnds
+ *   (none declared in §2.2.4.3)
+ * @operations
+ *   (inherited from DataWriterListener)
+ * @constraints
+ *   (none declared in §2.2.4.3)
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IPublisherListener extends IDataWriterListener {}
+
+export class PublisherListener implements IPublisherListener {
+  readonly metaClass = "PublisherListener" as const;
+  on_offered_deadline_missed(
+    _writer: IDataWriter,
+    _status: IOfferedDeadlineMissedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_offered_incompatible_qos(
+    _writer: IDataWriter,
+    _status: IOfferedIncompatibleQosStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_liveliness_lost(
+    _writer: IDataWriter,
+    _status: ILivelinessLostStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_publication_matched(
+    _writer: IDataWriter,
+    _status: IPublicationMatchedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+}
+
+// ─── 94. DataReaderListener (§2.2.4.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.3
+ * @metaclass concrete
+ * @generalization IListener
+ * @definition DataReaderListener is the listener specialized to a
+ *   DataReader Entity. Per §2.2.4.3 Figure 2.17 and dds_dcps.idl, it
+ *   declares one callback per plain communication status that may be
+ *   surfaced on a DataReader (on_requested_deadline_missed,
+ *   on_requested_incompatible_qos, on_sample_rejected,
+ *   on_liveliness_changed, on_subscription_matched, on_sample_lost) plus
+ *   the read communication status callback on_data_available.
+ *   on_data_available is the only callback that takes the_reader alone
+ *   (no status struct) — its very firing is the notification.
+ * @ownedAttributes
+ *   (none declared in §2.2.4.3)
+ * @associationEnds
+ *   (none declared in §2.2.4.3)
+ * @operations
+ *   on_requested_deadline_missed(the_reader : DataReader, status : RequestedDeadlineMissedStatus) : void
+ *   on_requested_incompatible_qos(the_reader : DataReader, status : RequestedIncompatibleQosStatus) : void
+ *   on_sample_rejected(the_reader : DataReader, status : SampleRejectedStatus) : void
+ *   on_liveliness_changed(the_reader : DataReader, status : LivelinessChangedStatus) : void
+ *   on_data_available(the_reader : DataReader) : void
+ *   on_subscription_matched(the_reader : DataReader, status : SubscriptionMatchedStatus) : void
+ *   on_sample_lost(the_reader : DataReader, status : SampleLostStatus) : void
+ * @constraints
+ *   (none declared in §2.2.4.3)
+ */
+export interface IDataReaderListener extends IListener {
+  on_requested_deadline_missed(
+    the_reader: IDataReader,
+    status: IRequestedDeadlineMissedStatus
+  ): void;
+  on_requested_incompatible_qos(
+    the_reader: IDataReader,
+    status: IRequestedIncompatibleQosStatus
+  ): void;
+  on_sample_rejected(
+    the_reader: IDataReader,
+    status: ISampleRejectedStatus
+  ): void;
+  on_liveliness_changed(
+    the_reader: IDataReader,
+    status: ILivelinessChangedStatus
+  ): void;
+  on_data_available(the_reader: IDataReader): void;
+  on_subscription_matched(
+    the_reader: IDataReader,
+    status: ISubscriptionMatchedStatus
+  ): void;
+  on_sample_lost(
+    the_reader: IDataReader,
+    status: ISampleLostStatus
+  ): void;
+}
+
+export class DataReaderListener implements IDataReaderListener {
+  readonly metaClass = "DataReaderListener" as const;
+  on_requested_deadline_missed(
+    _the_reader: IDataReader,
+    _status: IRequestedDeadlineMissedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_requested_incompatible_qos(
+    _the_reader: IDataReader,
+    _status: IRequestedIncompatibleQosStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_sample_rejected(
+    _the_reader: IDataReader,
+    _status: ISampleRejectedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_liveliness_changed(
+    _the_reader: IDataReader,
+    _status: ILivelinessChangedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_data_available(_the_reader: IDataReader): void {
+    // default: NO-OP `nil' listener
+  }
+  on_subscription_matched(
+    _the_reader: IDataReader,
+    _status: ISubscriptionMatchedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_sample_lost(
+    _the_reader: IDataReader,
+    _status: ISampleLostStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+}
+
+// ─── 95. SubscriberListener (§2.2.4.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.3
+ * @metaclass concrete
+ * @generalization IDataReaderListener
+ * @definition SubscriberListener is the listener specialized to a
+ *   Subscriber Entity. Per §2.2.4.3 Figure 2.17 and dds_dcps.idl
+ *   (`interface SubscriberListener : DataReaderListener { void
+ *   on_data_on_readers(in Subscriber the_subscriber); };`),
+ *   SubscriberListener inherits every DataReader callback from
+ *   DataReaderListener and adds the single read-communication-status
+ *   callback `on_data_on_readers`. Per §2.2.4.3.2, when read communication
+ *   status changes, the middleware first tries to trigger
+ *   on_data_on_readers on the related Subscriber; if that does not
+ *   succeed (no listener or operation non-enabled), it tries to trigger
+ *   on_data_available on all the related DataReaderListener objects.
+ * @ownedAttributes
+ *   (none declared in §2.2.4.3)
+ * @associationEnds
+ *   (none declared in §2.2.4.3)
+ * @operations
+ *   (inherited from DataReaderListener)
+ *   on_data_on_readers(the_subscriber : Subscriber) : void
+ * @constraints
+ *   (none declared in §2.2.4.3)
+ */
+export interface ISubscriberListener extends IDataReaderListener {
+  on_data_on_readers(the_subscriber: ISubscriber): void;
+}
+
+export class SubscriberListener implements ISubscriberListener {
+  readonly metaClass = "SubscriberListener" as const;
+  on_requested_deadline_missed(
+    _the_reader: IDataReader,
+    _status: IRequestedDeadlineMissedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_requested_incompatible_qos(
+    _the_reader: IDataReader,
+    _status: IRequestedIncompatibleQosStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_sample_rejected(
+    _the_reader: IDataReader,
+    _status: ISampleRejectedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_liveliness_changed(
+    _the_reader: IDataReader,
+    _status: ILivelinessChangedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_data_available(_the_reader: IDataReader): void {
+    // default: NO-OP `nil' listener
+  }
+  on_subscription_matched(
+    _the_reader: IDataReader,
+    _status: ISubscriptionMatchedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_sample_lost(
+    _the_reader: IDataReader,
+    _status: ISampleLostStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_data_on_readers(_the_subscriber: ISubscriber): void {
+    // default: NO-OP `nil' listener
+  }
+}
+
+// ─── 96. DomainParticipantListener (§2.2.4.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.4.3
+ * @metaclass concrete
+ * @generalization ITopicListener, IPublisherListener, ISubscriberListener
+ * @definition DomainParticipantListener is the listener specialized to a
+ *   DomainParticipant Entity. Per §2.2.4.3 Figure 2.17 and dds_dcps.idl
+ *   (`interface DomainParticipantListener : TopicListener,
+ *   PublisherListener, SubscriberListener {};`), it inherits — via IDL
+ *   multiple inheritance — every callback declared on TopicListener,
+ *   PublisherListener (which itself inherits from DataWriterListener), and
+ *   SubscriberListener (which itself inherits from DataReaderListener),
+ *   and adds no operations of its own. The DomainParticipant embeds every
+ *   other Entity (see §2.2.4.3.1 Figure 2.18), so its listener is the
+ *   final default-fallback target when more-specific listeners do not
+ *   handle a given status change.
+ *
+ *   TypeScript inheritance choice: an interface that `extends` three
+ *   parents (multiple-interface-inheritance — fully supported by the
+ *   TypeScript type system) directly mirrors the IDL. The concrete class
+ *   re-declares every inherited callback as a NO-OP because TypeScript
+ *   classes do not support multiple-class inheritance and the `implements`
+ *   clause on a class does not provide member bodies.
+ * @ownedAttributes
+ *   (none declared in §2.2.4.3)
+ * @associationEnds
+ *   (none declared in §2.2.4.3)
+ * @operations
+ *   (inherited from TopicListener, PublisherListener, SubscriberListener)
+ * @constraints
+ *   (none declared in §2.2.4.3)
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IDomainParticipantListener
+  extends ITopicListener,
+    IPublisherListener,
+    ISubscriberListener {}
+
+export class DomainParticipantListener implements IDomainParticipantListener {
+  readonly metaClass = "DomainParticipantListener" as const;
+  on_inconsistent_topic(
+    _the_topic: ITopic,
+    _status: IInconsistentTopicStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_offered_deadline_missed(
+    _writer: IDataWriter,
+    _status: IOfferedDeadlineMissedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_offered_incompatible_qos(
+    _writer: IDataWriter,
+    _status: IOfferedIncompatibleQosStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_liveliness_lost(
+    _writer: IDataWriter,
+    _status: ILivelinessLostStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_publication_matched(
+    _writer: IDataWriter,
+    _status: IPublicationMatchedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_requested_deadline_missed(
+    _the_reader: IDataReader,
+    _status: IRequestedDeadlineMissedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_requested_incompatible_qos(
+    _the_reader: IDataReader,
+    _status: IRequestedIncompatibleQosStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_sample_rejected(
+    _the_reader: IDataReader,
+    _status: ISampleRejectedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_liveliness_changed(
+    _the_reader: IDataReader,
+    _status: ILivelinessChangedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_data_available(_the_reader: IDataReader): void {
+    // default: NO-OP `nil' listener
+  }
+  on_subscription_matched(
+    _the_reader: IDataReader,
+    _status: ISubscriptionMatchedStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_sample_lost(
+    _the_reader: IDataReader,
+    _status: ISampleLostStatus
+  ): void {
+    // default: NO-OP `nil' listener
+  }
+  on_data_on_readers(_the_subscriber: ISubscriber): void {
+    // default: NO-OP `nil' listener
+  }
+}
+
+// ─── 97. ParticipantBuiltinTopicData (§2.2.5 — DCPSParticipant) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.5
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition ParticipantBuiltinTopicData is the data carrier published on
+ *   the built-in topic "DCPSParticipant" (entry created when a
+ *   DomainParticipant object is created). Per the §2.2.5 Built-in Topics
+ *   table and dds_dcps.idl: `key` — DCPS key to distinguish entries;
+ *   `user_data` — Policy of the corresponding DomainParticipant.
+ * @ownedAttributes
+ *   key : BuiltinTopicKey_t [1]
+ *   user_data : UserDataQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.5)
+ * @operations
+ *   (none declared in §2.2.5)
+ * @constraints
+ *   (none declared in §2.2.5)
+ */
+export interface IParticipantBuiltinTopicData {
+  readonly key: IBuiltinTopicKey_t;
+  readonly user_data: IUserDataQosPolicy;
+}
+
+export class ParticipantBuiltinTopicData
+  implements IParticipantBuiltinTopicData
+{
+  readonly metaClass = "ParticipantBuiltinTopicData" as const;
+  readonly key: IBuiltinTopicKey_t;
+  readonly user_data: IUserDataQosPolicy;
+  constructor(data: {
+    key: IBuiltinTopicKey_t;
+    user_data: IUserDataQosPolicy;
+  }) {
+    this.key = data.key;
+    this.user_data = data.user_data;
+  }
+}
+
+// ─── 98. TopicBuiltinTopicData (§2.2.5 — DCPSTopic) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.5
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition TopicBuiltinTopicData is the data carrier published on the
+ *   built-in topic "DCPSTopic" (entry created when a Topic object is
+ *   created). Per the §2.2.5 Built-in Topics table and dds_dcps.idl: `key`
+ *   — DCPS key to distinguish entries; `name` — name of the Topic;
+ *   `type_name` — name of the type attached to the Topic; the remaining
+ *   fields carry the QoS policies of the corresponding Topic
+ *   (durability, durability_service, deadline, latency_budget, liveliness,
+ *   reliability, transport_priority, lifespan, destination_order, history,
+ *   resource_limits, ownership, topic_data).
+ * @ownedAttributes
+ *   key : BuiltinTopicKey_t [1]
+ *   name : string [1]
+ *   type_name : string [1]
+ *   durability : DurabilityQosPolicy [1]
+ *   durability_service : DurabilityServiceQosPolicy [1]
+ *   deadline : DeadlineQosPolicy [1]
+ *   latency_budget : LatencyBudgetQosPolicy [1]
+ *   liveliness : LivelinessQosPolicy [1]
+ *   reliability : ReliabilityQosPolicy [1]
+ *   transport_priority : TransportPriorityQosPolicy [1]
+ *   lifespan : LifespanQosPolicy [1]
+ *   destination_order : DestinationOrderQosPolicy [1]
+ *   history : HistoryQosPolicy [1]
+ *   resource_limits : ResourceLimitsQosPolicy [1]
+ *   ownership : OwnershipQosPolicy [1]
+ *   topic_data : TopicDataQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.5)
+ * @operations
+ *   (none declared in §2.2.5)
+ * @constraints
+ *   (none declared in §2.2.5)
+ */
+export interface ITopicBuiltinTopicData {
+  readonly key: IBuiltinTopicKey_t;
+  readonly name: string;
+  readonly type_name: string;
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly transport_priority: ITransportPriorityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly topic_data: ITopicDataQosPolicy;
+}
+
+export class TopicBuiltinTopicData implements ITopicBuiltinTopicData {
+  readonly metaClass = "TopicBuiltinTopicData" as const;
+  readonly key: IBuiltinTopicKey_t;
+  readonly name: string;
+  readonly type_name: string;
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly transport_priority: ITransportPriorityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly topic_data: ITopicDataQosPolicy;
+  constructor(data: {
+    key: IBuiltinTopicKey_t;
+    name: string;
+    type_name: string;
+    durability: IDurabilityQosPolicy;
+    durability_service: IDurabilityServiceQosPolicy;
+    deadline: IDeadlineQosPolicy;
+    latency_budget: ILatencyBudgetQosPolicy;
+    liveliness: ILivelinessQosPolicy;
+    reliability: IReliabilityQosPolicy;
+    transport_priority: ITransportPriorityQosPolicy;
+    lifespan: ILifespanQosPolicy;
+    destination_order: IDestinationOrderQosPolicy;
+    history: IHistoryQosPolicy;
+    resource_limits: IResourceLimitsQosPolicy;
+    ownership: IOwnershipQosPolicy;
+    topic_data: ITopicDataQosPolicy;
+  }) {
+    this.key = data.key;
+    this.name = data.name;
+    this.type_name = data.type_name;
+    this.durability = data.durability;
+    this.durability_service = data.durability_service;
+    this.deadline = data.deadline;
+    this.latency_budget = data.latency_budget;
+    this.liveliness = data.liveliness;
+    this.reliability = data.reliability;
+    this.transport_priority = data.transport_priority;
+    this.lifespan = data.lifespan;
+    this.destination_order = data.destination_order;
+    this.history = data.history;
+    this.resource_limits = data.resource_limits;
+    this.ownership = data.ownership;
+    this.topic_data = data.topic_data;
+  }
+}
+
+// ─── 99. PublicationBuiltinTopicData (§2.2.5 — DCPSPublication) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.5
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition PublicationBuiltinTopicData is the data carrier published on
+ *   the built-in topic "DCPSPublication" (entry created when a DataWriter
+ *   is created in association with its Publisher). Per the §2.2.5
+ *   Built-in Topics table and dds_dcps.idl: `key` — DCPS key to
+ *   distinguish entries; `participant_key` — DCPS key of the participant
+ *   to which the DataWriter belongs; `topic_name` — name of the related
+ *   Topic; `type_name` — name of the type attached to the related Topic;
+ *   the remaining fields carry the QoS policies of the corresponding
+ *   DataWriter, the Publisher to which the DataWriter belongs, or the
+ *   related Topic (durability, durability_service, deadline,
+ *   latency_budget, liveliness, reliability, lifespan, user_data,
+ *   ownership, ownership_strength, destination_order, presentation,
+ *   partition, topic_data, group_data).
+ * @ownedAttributes
+ *   key : BuiltinTopicKey_t [1]
+ *   participant_key : BuiltinTopicKey_t [1]
+ *   topic_name : string [1]
+ *   type_name : string [1]
+ *   durability : DurabilityQosPolicy [1]
+ *   durability_service : DurabilityServiceQosPolicy [1]
+ *   deadline : DeadlineQosPolicy [1]
+ *   latency_budget : LatencyBudgetQosPolicy [1]
+ *   liveliness : LivelinessQosPolicy [1]
+ *   reliability : ReliabilityQosPolicy [1]
+ *   lifespan : LifespanQosPolicy [1]
+ *   user_data : UserDataQosPolicy [1]
+ *   ownership : OwnershipQosPolicy [1]
+ *   ownership_strength : OwnershipStrengthQosPolicy [1]
+ *   destination_order : DestinationOrderQosPolicy [1]
+ *   presentation : PresentationQosPolicy [1]
+ *   partition : PartitionQosPolicy [1]
+ *   topic_data : TopicDataQosPolicy [1]
+ *   group_data : GroupDataQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.5)
+ * @operations
+ *   (none declared in §2.2.5)
+ * @constraints
+ *   (none declared in §2.2.5)
+ */
+export interface IPublicationBuiltinTopicData {
+  readonly key: IBuiltinTopicKey_t;
+  readonly participant_key: IBuiltinTopicKey_t;
+  readonly topic_name: string;
+  readonly type_name: string;
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly ownership_strength: IOwnershipStrengthQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly topic_data: ITopicDataQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+}
+
+export class PublicationBuiltinTopicData
+  implements IPublicationBuiltinTopicData
+{
+  readonly metaClass = "PublicationBuiltinTopicData" as const;
+  readonly key: IBuiltinTopicKey_t;
+  readonly participant_key: IBuiltinTopicKey_t;
+  readonly topic_name: string;
+  readonly type_name: string;
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly ownership_strength: IOwnershipStrengthQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly topic_data: ITopicDataQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+  constructor(data: {
+    key: IBuiltinTopicKey_t;
+    participant_key: IBuiltinTopicKey_t;
+    topic_name: string;
+    type_name: string;
+    durability: IDurabilityQosPolicy;
+    durability_service: IDurabilityServiceQosPolicy;
+    deadline: IDeadlineQosPolicy;
+    latency_budget: ILatencyBudgetQosPolicy;
+    liveliness: ILivelinessQosPolicy;
+    reliability: IReliabilityQosPolicy;
+    lifespan: ILifespanQosPolicy;
+    user_data: IUserDataQosPolicy;
+    ownership: IOwnershipQosPolicy;
+    ownership_strength: IOwnershipStrengthQosPolicy;
+    destination_order: IDestinationOrderQosPolicy;
+    presentation: IPresentationQosPolicy;
+    partition: IPartitionQosPolicy;
+    topic_data: ITopicDataQosPolicy;
+    group_data: IGroupDataQosPolicy;
+  }) {
+    this.key = data.key;
+    this.participant_key = data.participant_key;
+    this.topic_name = data.topic_name;
+    this.type_name = data.type_name;
+    this.durability = data.durability;
+    this.durability_service = data.durability_service;
+    this.deadline = data.deadline;
+    this.latency_budget = data.latency_budget;
+    this.liveliness = data.liveliness;
+    this.reliability = data.reliability;
+    this.lifespan = data.lifespan;
+    this.user_data = data.user_data;
+    this.ownership = data.ownership;
+    this.ownership_strength = data.ownership_strength;
+    this.destination_order = data.destination_order;
+    this.presentation = data.presentation;
+    this.partition = data.partition;
+    this.topic_data = data.topic_data;
+    this.group_data = data.group_data;
+  }
+}
+
+// ─── 100. SubscriptionBuiltinTopicData (§2.2.5 — DCPSSubscription) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.5
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition SubscriptionBuiltinTopicData is the data carrier published
+ *   on the built-in topic "DCPSSubscription" (entry created when a
+ *   DataReader is created in association with its Subscriber). Per the
+ *   §2.2.5 Built-in Topics table and dds_dcps.idl: `key` — DCPS key to
+ *   distinguish entries; `participant_key` — DCPS key of the participant
+ *   to which the DataReader belongs; `topic_name` — name of the related
+ *   Topic; `type_name` — name of the type attached to the related Topic;
+ *   the remaining fields carry the QoS policies of the corresponding
+ *   DataReader, the Subscriber to which the DataReader belongs, or the
+ *   related Topic (durability, deadline, latency_budget, liveliness,
+ *   reliability, ownership, destination_order, user_data,
+ *   time_based_filter, presentation, partition, topic_data, group_data).
+ * @ownedAttributes
+ *   key : BuiltinTopicKey_t [1]
+ *   participant_key : BuiltinTopicKey_t [1]
+ *   topic_name : string [1]
+ *   type_name : string [1]
+ *   durability : DurabilityQosPolicy [1]
+ *   deadline : DeadlineQosPolicy [1]
+ *   latency_budget : LatencyBudgetQosPolicy [1]
+ *   liveliness : LivelinessQosPolicy [1]
+ *   reliability : ReliabilityQosPolicy [1]
+ *   ownership : OwnershipQosPolicy [1]
+ *   destination_order : DestinationOrderQosPolicy [1]
+ *   user_data : UserDataQosPolicy [1]
+ *   time_based_filter : TimeBasedFilterQosPolicy [1]
+ *   presentation : PresentationQosPolicy [1]
+ *   partition : PartitionQosPolicy [1]
+ *   topic_data : TopicDataQosPolicy [1]
+ *   group_data : GroupDataQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.5)
+ * @operations
+ *   (none declared in §2.2.5)
+ * @constraints
+ *   (none declared in §2.2.5)
+ */
+export interface ISubscriptionBuiltinTopicData {
+  readonly key: IBuiltinTopicKey_t;
+  readonly participant_key: IBuiltinTopicKey_t;
+  readonly topic_name: string;
+  readonly type_name: string;
+  readonly durability: IDurabilityQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly time_based_filter: ITimeBasedFilterQosPolicy;
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly topic_data: ITopicDataQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+}
+
+export class SubscriptionBuiltinTopicData
+  implements ISubscriptionBuiltinTopicData
+{
+  readonly metaClass = "SubscriptionBuiltinTopicData" as const;
+  readonly key: IBuiltinTopicKey_t;
+  readonly participant_key: IBuiltinTopicKey_t;
+  readonly topic_name: string;
+  readonly type_name: string;
+  readonly durability: IDurabilityQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly time_based_filter: ITimeBasedFilterQosPolicy;
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly topic_data: ITopicDataQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+  constructor(data: {
+    key: IBuiltinTopicKey_t;
+    participant_key: IBuiltinTopicKey_t;
+    topic_name: string;
+    type_name: string;
+    durability: IDurabilityQosPolicy;
+    deadline: IDeadlineQosPolicy;
+    latency_budget: ILatencyBudgetQosPolicy;
+    liveliness: ILivelinessQosPolicy;
+    reliability: IReliabilityQosPolicy;
+    ownership: IOwnershipQosPolicy;
+    destination_order: IDestinationOrderQosPolicy;
+    user_data: IUserDataQosPolicy;
+    time_based_filter: ITimeBasedFilterQosPolicy;
+    presentation: IPresentationQosPolicy;
+    partition: IPartitionQosPolicy;
+    topic_data: ITopicDataQosPolicy;
+    group_data: IGroupDataQosPolicy;
+  }) {
+    this.key = data.key;
+    this.participant_key = data.participant_key;
+    this.topic_name = data.topic_name;
+    this.type_name = data.type_name;
+    this.durability = data.durability;
+    this.deadline = data.deadline;
+    this.latency_budget = data.latency_budget;
+    this.liveliness = data.liveliness;
+    this.reliability = data.reliability;
+    this.ownership = data.ownership;
+    this.destination_order = data.destination_order;
+    this.user_data = data.user_data;
+    this.time_based_filter = data.time_based_filter;
+    this.presentation = data.presentation;
+    this.partition = data.partition;
+    this.topic_data = data.topic_data;
+    this.group_data = data.group_data;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// — END Implementer #4: Listeners + Status + BuiltinTopicData —
+//
+// Inventory inserted in this section:
+//   • SampleRejectedStatusKind        (1 const-object + literal-union type)
+//   • QosPolicyCount                  (1 — interface + class, support type
+//                                        for OfferedIncompatibleQosStatus &
+//                                        RequestedIncompatibleQosStatus)
+//   • Status structs                  (11 — InconsistentTopicStatus,
+//       SampleLostStatus, SampleRejectedStatus, LivelinessLostStatus,
+//       LivelinessChangedStatus, OfferedDeadlineMissedStatus,
+//       RequestedDeadlineMissedStatus, OfferedIncompatibleQosStatus,
+//       RequestedIncompatibleQosStatus, PublicationMatchedStatus,
+//       SubscriptionMatchedStatus)
+//   • Listener tree                   (7 — Listener marker, TopicListener,
+//       DataWriterListener, PublisherListener (extends DataWriterListener),
+//       DataReaderListener, SubscriberListener (extends DataReaderListener),
+//       DomainParticipantListener (multi-extends TopicListener +
+//       PublisherListener + SubscriberListener via TS interface
+//       multiple-inheritance))
+//   • BuiltinTopicData carriers       (4 — ParticipantBuiltinTopicData,
+//       TopicBuiltinTopicData, PublicationBuiltinTopicData,
+//       SubscriptionBuiltinTopicData)
+//
+// Listener inheritance choice for DomainParticipantListener:
+//   The IDL declares
+//     `interface DomainParticipantListener : TopicListener,
+//      PublisherListener, SubscriberListener {};`
+//   — IDL multiple inheritance. TypeScript interfaces support
+//   multiple-interface-inheritance natively (`interface X extends A, B, C`),
+//   so `IDomainParticipantListener extends ITopicListener,
+//   IPublisherListener, ISubscriberListener` mirrors the IDL exactly. The
+//   concrete `DomainParticipantListener` class re-declares every inherited
+//   callback as a NO-OP (TypeScript does not support multiple-class
+//   inheritance and `implements` provides no method bodies).
+//
+// Spec ambiguity flagged in this partition:
+//   • The partition brief cites "§2.3.7" for BuiltinTopicData. The DDS 1.4
+//     specification (formal/2015-04-10) names the section "2.2.5 Built-in
+//     Topics" — there is no §2.3.7 chapter. The struct definitions in
+//     dds_dcps.idl that this section codifies (ParticipantBuiltinTopicData,
+//     TopicBuiltinTopicData, PublicationBuiltinTopicData,
+//     SubscriptionBuiltinTopicData) all map to the §2.2.5 narrative.
+//     Section tags below cite §2.2.5 accordingly. @section §?
+//   • The partition brief cites "§2.2.5.1" for TopicListener. The DDS 1.4
+//     spec does not declare a sub-section §2.2.5.1 for TopicListener — the
+//     TopicListener IDL lives in dds_dcps.idl alongside the rest of the
+//     Listener tree, and the §2.2.4.3 narrative covers its semantics
+//     uniformly with the other concrete listeners. Section tag retained
+//     for traceability to the brief; downstream readers should consult
+//     §2.2.4.3 + dds_dcps.idl. @section §?
+//
+// Deferred to implementer #5 (DLRL §2.3.x):
+//   • Conditions & WaitSet (§2.2.4.4 / §2.2.4.5): Condition (abstract),
+//     GuardCondition, StatusCondition, ReadCondition, QueryCondition,
+//     WaitSet — already partially deferred from Implementer #2's spine.
+//     [optional — confirm scope with implementer #5]
+//   • DLRL Foundation (§2.3): RelationKind, ObjectRoot, Selection, Cache,
+//     CacheBase, Contract, ObjectScope, ObjectHome, ObjectListener,
+//     CacheListener, SelectionListener, ObjectReference, ObjectModifier,
+//     and the DLRL relation-end types (StrRelation, RefRelation,
+//     ListRelation, SetRelation, MapRelation, MultiRelation).
+//   • Built-in Subscriber lookup operations (§2.2.5 narrative — the
+//     get_builtin_subscriber + lookup_datareader pattern that returns
+//     DataReader<ParticipantBuiltinTopicData> et al). These belong to the
+//     DLRL/built-in-discovery layer.
+//   • Final index.ts namespace barrel — populate `dds.{concept}.{verb}`
+//     export surface after all five implementer sections compile.
+// ═══════════════════════════════════════════════════════════════════════════
