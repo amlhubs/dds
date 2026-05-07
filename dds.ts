@@ -1847,3 +1847,1780 @@ export class DataReader implements IDataReader {
 //     Surfaced as an optional field with an explanatory JSDoc note.
 //     @section §?
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BEGIN Implementer #3: QoS Policies
+// (QosPolicy abstract base + QosPolicyId_t constants + 22 concrete
+//  QoS-policy classes covering §2.2.3.1 .. §2.2.3.22 + 7 supporting kind
+//  enumerations + 7 per-Entity Qos bundles)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── 39. QosPolicyId_t (§2.2.3 — DCPS IDL `typedef long QosPolicyId_t`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass typedef + closed enumeration of named integer constants
+ * @generalization (root)
+ * @definition QosPolicyId_t is the typedef used by the DCPS PSM to identify
+ *   each QosPolicy by an integer id. The DCPS IDL defines named const values
+ *   (INVALID_QOS_POLICY_ID = 0, USERDATA_QOS_POLICY_ID = 1, ...,
+ *   DURABILITYSERVICE_QOS_POLICY_ID = 22) for the 22 standard QoS policies
+ *   plus the sentinel "INVALID" identifier.
+ * @ownedAttributes
+ *   (closed enumeration of integer constants; see DCPS IDL `typedef long
+ *    QosPolicyId_t` and the named const QosPolicyId_t values)
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3)
+ */
+export const QOS_POLICY_ID = {
+  INVALID_QOS_POLICY_ID: 0,
+  USERDATA_QOS_POLICY_ID: 1,
+  DURABILITY_QOS_POLICY_ID: 2,
+  PRESENTATION_QOS_POLICY_ID: 3,
+  DEADLINE_QOS_POLICY_ID: 4,
+  LATENCYBUDGET_QOS_POLICY_ID: 5,
+  OWNERSHIP_QOS_POLICY_ID: 6,
+  OWNERSHIPSTRENGTH_QOS_POLICY_ID: 7,
+  LIVELINESS_QOS_POLICY_ID: 8,
+  TIMEBASEDFILTER_QOS_POLICY_ID: 9,
+  PARTITION_QOS_POLICY_ID: 10,
+  RELIABILITY_QOS_POLICY_ID: 11,
+  DESTINATIONORDER_QOS_POLICY_ID: 12,
+  HISTORY_QOS_POLICY_ID: 13,
+  RESOURCELIMITS_QOS_POLICY_ID: 14,
+  ENTITYFACTORY_QOS_POLICY_ID: 15,
+  WRITERDATALIFECYCLE_QOS_POLICY_ID: 16,
+  READERDATALIFECYCLE_QOS_POLICY_ID: 17,
+  TOPICDATA_QOS_POLICY_ID: 18,
+  GROUPDATA_QOS_POLICY_ID: 19,
+  TRANSPORTPRIORITY_QOS_POLICY_ID: 20,
+  LIFESPAN_QOS_POLICY_ID: 21,
+  DURABILITYSERVICE_QOS_POLICY_ID: 22,
+} as const;
+export type QosPolicyId_t = typeof QOS_POLICY_ID[keyof typeof QOS_POLICY_ID];
+
+// ─── 40. QosPolicy (§2.2.3 — abstract base, Figure 2.12) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition QosPolicy is the abstract supertype of every concrete QoS
+ *   policy carried by Entity-derived objects. Per Figure 2.12 ("Supported
+ *   QoS policies") the QosPolicy class declares the single attribute
+ *   `name : string` — every concrete subtype carries an immutable, spec-
+ *   prescribed `name` value matching the QoS-policy "name" cell of its
+ *   §2.2.3.x summary table (e.g., "UserData", "Reliability", "Liveliness").
+ *   Concrete policies extend QosPolicy and add their own typed value(s).
+ * @ownedAttributes
+ *   name : string [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 for the abstract base — RxO and
+ *    Changeable are declared per concrete subtype on its summary table)
+ */
+export interface IQosPolicy {
+  readonly name: string;
+}
+
+// ─── 41. UserDataQosPolicy (§2.2.3.1) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.1
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition The purpose of this QoS is to allow the application to attach
+ *   additional information to the created Entity objects such that when a
+ *   remote application discovers their existence it can access that
+ *   information and use it for its own purposes. One possible use of this
+ *   QoS is to attach security credentials or some other information that
+ *   can be used by the remote application to authenticate the source. In
+ *   combination with operations such as ignore_participant,
+ *   ignore_publication, ignore_subscription, and ignore_topic these QoS can
+ *   assist an application to define and enforce its own security policies.
+ *   The use of this QoS is not limited to security, rather it offers a
+ *   simple, yet flexible extensibility mechanism.
+ * @ownedAttributes
+ *   value : sequence<octet> [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.1)
+ * @operations
+ *   (none declared in §2.2.3.1)
+ * @constraints
+ *   Concerns: DomainParticipant, DataReader, DataWriter
+ *   RxO: No
+ *   Changeable: Yes
+ *   The default value is an empty (zero-sized) sequence.
+ */
+export interface IUserDataQosPolicy extends IQosPolicy {
+  readonly value: ReadonlyArray<number>;
+}
+
+export class UserDataQosPolicy implements IUserDataQosPolicy {
+  readonly metaClass = "UserDataQosPolicy" as const;
+  readonly name = "UserData" as const;
+  readonly value: ReadonlyArray<number>;
+  constructor(data: { value: ReadonlyArray<number> }) {
+    this.value = data.value;
+  }
+}
+
+// ─── 42. TopicDataQosPolicy (§2.2.3.2) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.2
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition The purpose of this QoS is to allow the application to attach
+ *   additional information to the created Topic such that when a remote
+ *   application discovers their existence it can examine the information
+ *   and use it in an application-defined way. In combination with the
+ *   listeners on the DataReader and DataWriter as well as by means of
+ *   operations such as ignore_topic, these QoS can assist an application
+ *   to extend the provided QoS.
+ * @ownedAttributes
+ *   value : sequence<octet> [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.2)
+ * @operations
+ *   (none declared in §2.2.3.2)
+ * @constraints
+ *   Concerns: Topic
+ *   RxO: No
+ *   Changeable: Yes
+ *   The default value is an empty (zero-sized) sequence.
+ */
+export interface ITopicDataQosPolicy extends IQosPolicy {
+  readonly value: ReadonlyArray<number>;
+}
+
+export class TopicDataQosPolicy implements ITopicDataQosPolicy {
+  readonly metaClass = "TopicDataQosPolicy" as const;
+  readonly name = "TopicData" as const;
+  readonly value: ReadonlyArray<number>;
+  constructor(data: { value: ReadonlyArray<number> }) {
+    this.value = data.value;
+  }
+}
+
+// ─── 43. GroupDataQosPolicy (§2.2.3.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.3
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition The purpose of this QoS is to allow the application to attach
+ *   additional information to the created Publisher or Subscriber. The
+ *   value of the GROUP_DATA is available to the application on the
+ *   DataReader and DataWriter entities and is propagated by means of the
+ *   built-in topics. This QoS can be used by an application combination
+ *   with the DataReaderListener and DataWriterListener to implement
+ *   matching policies similar to those of the PARTITION QoS except the
+ *   decision can be made based on an application-defined policy.
+ * @ownedAttributes
+ *   value : sequence<octet> [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.3)
+ * @operations
+ *   (none declared in §2.2.3.3)
+ * @constraints
+ *   Concerns: Publisher, Subscriber
+ *   RxO: No
+ *   Changeable: Yes
+ *   The default value is an empty (zero-sized) sequence.
+ */
+export interface IGroupDataQosPolicy extends IQosPolicy {
+  readonly value: ReadonlyArray<number>;
+}
+
+export class GroupDataQosPolicy implements IGroupDataQosPolicy {
+  readonly metaClass = "GroupDataQosPolicy" as const;
+  readonly name = "GroupData" as const;
+  readonly value: ReadonlyArray<number>;
+  constructor(data: { value: ReadonlyArray<number> }) {
+    this.value = data.value;
+  }
+}
+
+// ─── 44. TransportPriorityQosPolicy (§2.2.3.15) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.15
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition This policy is a hint to the infrastructure as to how to set
+ *   the priority of the underlying transport used to send the data. The
+ *   default value of the transport_priority is zero.
+ * @ownedAttributes
+ *   value : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.15)
+ * @operations
+ *   (none declared in §2.2.3.15)
+ * @constraints
+ *   Concerns: Topic, DataWriter
+ *   RxO: N/A
+ *   Changeable: Yes
+ */
+export interface ITransportPriorityQosPolicy extends IQosPolicy {
+  readonly value: number;
+}
+
+export class TransportPriorityQosPolicy implements ITransportPriorityQosPolicy {
+  readonly metaClass = "TransportPriorityQosPolicy" as const;
+  readonly name = "TransportPriority" as const;
+  readonly value: number;
+  constructor(data: { value: number }) {
+    this.value = data.value;
+  }
+}
+
+// ─── 45. LifespanQosPolicy (§2.2.3.16) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.16
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Specifies the maximum duration of validity of the data
+ *   written by the DataWriter. The default value of the lifespan duration
+ *   is infinite.
+ * @ownedAttributes
+ *   duration : Duration_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.16)
+ * @operations
+ *   (none declared in §2.2.3.16)
+ * @constraints
+ *   Concerns: Topic, DataWriter
+ *   RxO: N/A
+ *   Changeable: Yes
+ */
+export interface ILifespanQosPolicy extends IQosPolicy {
+  readonly duration: IDuration_t;
+}
+
+export class LifespanQosPolicy implements ILifespanQosPolicy {
+  readonly metaClass = "LifespanQosPolicy" as const;
+  readonly name = "Lifespan" as const;
+  readonly duration: IDuration_t;
+  constructor(data: { duration: IDuration_t }) {
+    this.duration = data.duration;
+  }
+}
+
+// ─── 46. DurabilityQosPolicyKind (§2.2.3.4 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.4
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition DurabilityQosPolicyKind is the closed enumeration of the
+ *   possible DURABILITY kinds. Per the §2.2.3.4 summary table:
+ *   VOLATILE (the default) — the Service does not need to keep any samples
+ *   of data-instances on behalf of any DataReader that is not known by the
+ *   DataWriter at the time the instance is written;
+ *   TRANSIENT_LOCAL — the service is only required to keep the data in the
+ *   memory of the DataWriter that wrote the data and the data is not
+ *   required to survive the DataWriter;
+ *   TRANSIENT — the service is only required to keep the data in memory and
+ *   not in permanent storage; but the data is not tied to the lifecycle of
+ *   the DataWriter and will, in general, survive it. Support for TRANSIENT
+ *   kind is optional;
+ *   PERSISTENT — [optional] Data is kept on permanent storage, so that they
+ *   can outlive a system session.
+ * @constraints
+ *   For the purposes of the offered/requested compatibility inequality the
+ *   values are ordered such that
+ *   VOLATILE < TRANSIENT_LOCAL < TRANSIENT < PERSISTENT.
+ */
+export const DURABILITY_QOS_POLICY_KIND = {
+  VOLATILE_DURABILITY_QOS: "VOLATILE_DURABILITY_QOS",
+  TRANSIENT_LOCAL_DURABILITY_QOS: "TRANSIENT_LOCAL_DURABILITY_QOS",
+  TRANSIENT_DURABILITY_QOS: "TRANSIENT_DURABILITY_QOS",
+  PERSISTENT_DURABILITY_QOS: "PERSISTENT_DURABILITY_QOS",
+} as const;
+export type DurabilityQosPolicyKind =
+  typeof DURABILITY_QOS_POLICY_KIND[keyof typeof DURABILITY_QOS_POLICY_KIND];
+
+// ─── 47. DurabilityQosPolicy (§2.2.3.4) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.4
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition This policy expresses if the data should `outlive' their
+ *   writing time. The decoupling between DataReader and DataWriter offered
+ *   by the Publish/Subscribe paradigm allows an application to write data
+ *   even if there are no current readers on the network. Moreover, a
+ *   DataReader that joins the network after some data has been written
+ *   could potentially be interested in accessing the most current values
+ *   of the data as well as potentially some history. This QoS policy
+ *   controls whether the Service will actually make data available to
+ *   late-joining readers.
+ * @ownedAttributes
+ *   kind : DurabilityQosPolicyKind [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.4)
+ * @operations
+ *   (none declared in §2.2.3.4)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: Yes
+ *   Changeable: No
+ *   The value offered is considered compatible with the value requested if
+ *   and only if the inequality "offered kind >= requested kind" evaluates
+ *   to `TRUE.' For the purposes of this inequality, the values of
+ *   DURABILITY kind are considered ordered such that
+ *   VOLATILE < TRANSIENT_LOCAL < TRANSIENT < PERSISTENT.
+ *   The default kind is VOLATILE.
+ */
+export interface IDurabilityQosPolicy extends IQosPolicy {
+  readonly kind: DurabilityQosPolicyKind;
+}
+
+export class DurabilityQosPolicy implements IDurabilityQosPolicy {
+  readonly metaClass = "DurabilityQosPolicy" as const;
+  readonly name = "Durability" as const;
+  readonly kind: DurabilityQosPolicyKind;
+  constructor(data: { kind: DurabilityQosPolicyKind }) {
+    this.kind = data.kind;
+  }
+}
+
+// ─── 48. PresentationQosPolicyAccessScopeKind (§2.2.3.6 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.6
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition PresentationQosPolicyAccessScopeKind is the closed
+ *   enumeration of the possible access_scope values for the PRESENTATION
+ *   QoS policy. Per the §2.2.3.6 summary table:
+ *   INSTANCE (the default) — Scope spans only a single instance. Indicates
+ *   that changes to one instance need not be coherent nor ordered with
+ *   respect to changes to any other instance;
+ *   TOPIC — Scope spans to all instances within the same DataWriter (or
+ *   DataReader), but not across instances in different DataWriter (or
+ *   DataReader);
+ *   GROUP — [optional] Scope spans to all instances belonging to
+ *   DataWriter (or DataReader) entities within the same Publisher (or
+ *   Subscriber).
+ * @constraints
+ *   For the purposes of the offered/requested compatibility inequality the
+ *   values are ordered such that INSTANCE < TOPIC < GROUP.
+ */
+export const PRESENTATION_QOS_POLICY_ACCESS_SCOPE_KIND = {
+  INSTANCE_PRESENTATION_QOS: "INSTANCE_PRESENTATION_QOS",
+  TOPIC_PRESENTATION_QOS: "TOPIC_PRESENTATION_QOS",
+  GROUP_PRESENTATION_QOS: "GROUP_PRESENTATION_QOS",
+} as const;
+export type PresentationQosPolicyAccessScopeKind =
+  typeof PRESENTATION_QOS_POLICY_ACCESS_SCOPE_KIND[keyof typeof PRESENTATION_QOS_POLICY_ACCESS_SCOPE_KIND];
+
+// ─── 49. PresentationQosPolicy (§2.2.3.6) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.6
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Specifies how the samples representing changes to data
+ *   instances are presented to the subscribing application. This policy
+ *   affects the application's ability to specify and receive coherent
+ *   changes and to see the relative order of changes. access_scope
+ *   determines the largest scope spanning the entities for which the order
+ *   and coherency of changes can be preserved. The two booleans control
+ *   whether coherent access and ordered access are supported within the
+ *   scope access_scope.
+ * @ownedAttributes
+ *   access_scope : PresentationQosPolicyAccessScopeKind [1]
+ *   coherent_access : boolean [1]
+ *   ordered_access : boolean [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.6)
+ * @operations
+ *   (none declared in §2.2.3.6)
+ * @constraints
+ *   Concerns: Publisher, Subscriber
+ *   RxO: Yes
+ *   Changeable: No
+ *   The value offered is considered compatible with the value requested if
+ *   and only if the following conditions are met:
+ *   1) The inequality "offered access_scope >= requested access_scope"
+ *      evaluates to `TRUE.' For the purposes of this inequality, the values
+ *      of PRESENTATION access_scope are considered ordered such that
+ *      INSTANCE < TOPIC < GROUP.
+ *   2) Requested coherent_access is FALSE, or else both offered and
+ *      requested coherent_access are TRUE.
+ *   3) Requested ordered_access is FALSE, or else both offered and
+ *      requested ordered_access are TRUE.
+ *   The default access_scope is INSTANCE; the default for coherent_access
+ *   and ordered_access is FALSE.
+ */
+export interface IPresentationQosPolicy extends IQosPolicy {
+  readonly access_scope: PresentationQosPolicyAccessScopeKind;
+  readonly coherent_access: boolean;
+  readonly ordered_access: boolean;
+}
+
+export class PresentationQosPolicy implements IPresentationQosPolicy {
+  readonly metaClass = "PresentationQosPolicy" as const;
+  readonly name = "Presentation" as const;
+  readonly access_scope: PresentationQosPolicyAccessScopeKind;
+  readonly coherent_access: boolean;
+  readonly ordered_access: boolean;
+  constructor(data: {
+    access_scope: PresentationQosPolicyAccessScopeKind;
+    coherent_access: boolean;
+    ordered_access: boolean;
+  }) {
+    this.access_scope = data.access_scope;
+    this.coherent_access = data.coherent_access;
+    this.ordered_access = data.ordered_access;
+  }
+}
+
+// ─── 50. DeadlineQosPolicy (§2.2.3.7) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.7
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition DataReader expects a new sample updating the value of each
+ *   instance at least once every deadline period. DataWriter indicates
+ *   that the application commits to write a new value (using the
+ *   DataWriter) for each instance managed by the DataWriter at least once
+ *   every deadline period. It is inconsistent for a DataReader to have a
+ *   DEADLINE period less than its TIME_BASED_FILTER's minimum_separation.
+ *   The default value of the deadline period is infinite.
+ * @ownedAttributes
+ *   period : Duration_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.7)
+ * @operations
+ *   (none declared in §2.2.3.7)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: Yes
+ *   Changeable: Yes
+ *   The value offered is considered compatible with the value requested if
+ *   and only if the inequality "offered deadline period <= requested
+ *   deadline period" evaluates to `TRUE.' The setting of the DEADLINE
+ *   policy must be set consistently with that of the TIME_BASED_FILTER.
+ *   For these two policies to be consistent the settings must be such that
+ *   "deadline period >= minimum_separation."
+ */
+export interface IDeadlineQosPolicy extends IQosPolicy {
+  readonly period: IDuration_t;
+}
+
+export class DeadlineQosPolicy implements IDeadlineQosPolicy {
+  readonly metaClass = "DeadlineQosPolicy" as const;
+  readonly name = "Deadline" as const;
+  readonly period: IDuration_t;
+  constructor(data: { period: IDuration_t }) {
+    this.period = data.period;
+  }
+}
+
+// ─── 51. LatencyBudgetQosPolicy (§2.2.3.8) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.8
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Specifies the maximum acceptable delay from the time the
+ *   data is written until the data is inserted in the receiver's
+ *   application-cache and the receiving application is notified of the
+ *   fact. This policy is a hint to the Service, not something that must be
+ *   monitored or enforced. The Service is not required to track or alert
+ *   the user of any violation. The default value of the duration is zero
+ *   indicating that the delay should be minimized.
+ * @ownedAttributes
+ *   duration : Duration_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.8)
+ * @operations
+ *   (none declared in §2.2.3.8)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: Yes
+ *   Changeable: Yes
+ *   The value offered is considered compatible with the value requested if
+ *   and only if the inequality "offered duration <= requested duration"
+ *   evaluates to `TRUE.'
+ */
+export interface ILatencyBudgetQosPolicy extends IQosPolicy {
+  readonly duration: IDuration_t;
+}
+
+export class LatencyBudgetQosPolicy implements ILatencyBudgetQosPolicy {
+  readonly metaClass = "LatencyBudgetQosPolicy" as const;
+  readonly name = "LatencyBudget" as const;
+  readonly duration: IDuration_t;
+  constructor(data: { duration: IDuration_t }) {
+    this.duration = data.duration;
+  }
+}
+
+// ─── 52. OwnershipQosPolicyKind (§2.2.3.9 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.9
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition OwnershipQosPolicyKind is the closed enumeration of the
+ *   possible OWNERSHIP kinds. Per the §2.2.3.9 summary table:
+ *   SHARED — Indicates shared ownership for each instance. Multiple writers
+ *   are allowed to update the same instance and all the updates are made
+ *   available to the readers. In other words there is no concept of an
+ *   "owner" for the instances. This is the default behavior if the
+ *   OWNERSHIP QoS policy is not specified or supported;
+ *   EXCLUSIVE — [optional] Indicates each instance can only be owned by one
+ *   DataWriter, but the owner of an instance can change dynamically.
+ * @constraints
+ *   The value of the OWNERSHIP kind offered must exactly match the one
+ *   requested or else they are considered incompatible.
+ */
+export const OWNERSHIP_QOS_POLICY_KIND = {
+  SHARED_OWNERSHIP_QOS: "SHARED_OWNERSHIP_QOS",
+  EXCLUSIVE_OWNERSHIP_QOS: "EXCLUSIVE_OWNERSHIP_QOS",
+} as const;
+export type OwnershipQosPolicyKind =
+  typeof OWNERSHIP_QOS_POLICY_KIND[keyof typeof OWNERSHIP_QOS_POLICY_KIND];
+
+// ─── 53. OwnershipQosPolicy (§2.2.3.9) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.9
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition [optional] Specifies whether it is allowed for multiple
+ *   DataWriters to write the same instance of the data and if so, how
+ *   these modifications should be arbitrated. There are two kinds of
+ *   OWNERSHIP selected by the setting of the kind: SHARED and EXCLUSIVE.
+ * @ownedAttributes
+ *   kind : OwnershipQosPolicyKind [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.9)
+ * @operations
+ *   (none declared in §2.2.3.9)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: Yes
+ *   Changeable: No
+ *   The value of the OWNERSHIP kind offered must exactly match the one
+ *   requested or else they are considered incompatible. The default kind
+ *   is SHARED.
+ */
+export interface IOwnershipQosPolicy extends IQosPolicy {
+  readonly kind: OwnershipQosPolicyKind;
+}
+
+export class OwnershipQosPolicy implements IOwnershipQosPolicy {
+  readonly metaClass = "OwnershipQosPolicy" as const;
+  readonly name = "Ownership" as const;
+  readonly kind: OwnershipQosPolicyKind;
+  constructor(data: { kind: OwnershipQosPolicyKind }) {
+    this.kind = data.kind;
+  }
+}
+
+// ─── 54. OwnershipStrengthQosPolicy (§2.2.3.10) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.10
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition [optional] Specifies the value of the "strength" used to
+ *   arbitrate among multiple DataWriter objects that attempt to modify the
+ *   same instance of a data-object (identified by Topic + key). This
+ *   policy only applies if the OWNERSHIP QoS policy is of kind EXCLUSIVE.
+ *   The default value of the ownership_strength is zero.
+ * @ownedAttributes
+ *   value : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.10)
+ * @operations
+ *   (none declared in §2.2.3.10)
+ * @constraints
+ *   Concerns: DataWriter
+ *   RxO: N/A
+ *   Changeable: Yes
+ */
+export interface IOwnershipStrengthQosPolicy extends IQosPolicy {
+  readonly value: number;
+}
+
+export class OwnershipStrengthQosPolicy implements IOwnershipStrengthQosPolicy {
+  readonly metaClass = "OwnershipStrengthQosPolicy" as const;
+  readonly name = "OwnershipStrength" as const;
+  readonly value: number;
+  constructor(data: { value: number }) {
+    this.value = data.value;
+  }
+}
+
+// ─── 55. LivelinessQosPolicyKind (§2.2.3.11 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.11
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition LivelinessQosPolicyKind is the closed enumeration of the
+ *   possible LIVELINESS kinds. Per the §2.2.3.11 summary table:
+ *   AUTOMATIC (the default) — The infrastructure will automatically signal
+ *   liveliness for the DataWriters at least as often as required by the
+ *   lease_duration;
+ *   MANUAL_BY_PARTICIPANT — The Service will assume that as long as at
+ *   least one Entity within the DomainParticipant has asserted its
+ *   liveliness the other Entities in that same DomainParticipant are also
+ *   alive;
+ *   MANUAL_BY_TOPIC — The Service will only assume liveliness of the
+ *   DataWriter if the application has asserted liveliness of that
+ *   DataWriter itself.
+ * @constraints
+ *   For the purposes of the offered/requested compatibility inequality the
+ *   values are ordered such that
+ *   AUTOMATIC < MANUAL_BY_PARTICIPANT < MANUAL_BY_TOPIC.
+ */
+export const LIVELINESS_QOS_POLICY_KIND = {
+  AUTOMATIC_LIVELINESS_QOS: "AUTOMATIC_LIVELINESS_QOS",
+  MANUAL_BY_PARTICIPANT_LIVELINESS_QOS: "MANUAL_BY_PARTICIPANT_LIVELINESS_QOS",
+  MANUAL_BY_TOPIC_LIVELINESS_QOS: "MANUAL_BY_TOPIC_LIVELINESS_QOS",
+} as const;
+export type LivelinessQosPolicyKind =
+  typeof LIVELINESS_QOS_POLICY_KIND[keyof typeof LIVELINESS_QOS_POLICY_KIND];
+
+// ─── 56. LivelinessQosPolicy (§2.2.3.11) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.11
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Determines the mechanism and parameters used by the
+ *   application to determine whether an Entity is "active" (alive). The
+ *   "liveliness" status of an Entity is used to maintain instance
+ *   ownership in combination with the setting of the OWNERSHIP QoS policy.
+ *   The application is also informed via listener when an Entity is no
+ *   longer alive. The DataReader requests that liveliness of the writers
+ *   is maintained by the requested means and loss of liveliness is
+ *   detected with delay not to exceed the lease_duration. The DataWriter
+ *   commits to signalling its liveliness using the stated means at
+ *   intervals not to exceed the lease_duration. Listeners are used to
+ *   notify the DataReader of loss of liveliness and DataWriter of
+ *   violations to the liveliness contract.
+ * @ownedAttributes
+ *   kind : LivelinessQosPolicyKind [1]
+ *   lease_duration : Duration_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.11)
+ * @operations
+ *   (none declared in §2.2.3.11)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: Yes
+ *   Changeable: No
+ *   The value offered is considered compatible with the value requested if
+ *   and only if the inequality "offered kind >= requested kind" evaluates
+ *   to `TRUE.' For the purposes of this inequality the values of
+ *   LIVELINESS kind are considered ordered such that
+ *   AUTOMATIC < MANUAL_BY_PARTICIPANT < MANUAL_BY_TOPIC. The default kind
+ *   is AUTOMATIC and the default value of the lease_duration is infinite.
+ */
+export interface ILivelinessQosPolicy extends IQosPolicy {
+  readonly kind: LivelinessQosPolicyKind;
+  readonly lease_duration: IDuration_t;
+}
+
+export class LivelinessQosPolicy implements ILivelinessQosPolicy {
+  readonly metaClass = "LivelinessQosPolicy" as const;
+  readonly name = "Liveliness" as const;
+  readonly kind: LivelinessQosPolicyKind;
+  readonly lease_duration: IDuration_t;
+  constructor(data: {
+    kind: LivelinessQosPolicyKind;
+    lease_duration: IDuration_t;
+  }) {
+    this.kind = data.kind;
+    this.lease_duration = data.lease_duration;
+  }
+}
+
+// ─── 57. TimeBasedFilterQosPolicy (§2.2.3.12) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.12
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Filter that allows a DataReader to specify that it is
+ *   interested only in (potentially) a subset of the values of the data.
+ *   The filter states that the DataReader does not want to receive more
+ *   than one value each minimum_separation, regardless of how fast the
+ *   changes occur. It is inconsistent for a DataReader to have a
+ *   minimum_separation longer than its DEADLINE period. By default
+ *   minimum_separation = 0 indicating DataReader is potentially interested
+ *   in all values.
+ * @ownedAttributes
+ *   minimum_separation : Duration_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.12)
+ * @operations
+ *   (none declared in §2.2.3.12)
+ * @constraints
+ *   Concerns: DataReader
+ *   RxO: N/A
+ *   Changeable: Yes
+ *   It is inconsistent for a DataReader to have a TIME_BASED_FILTER
+ *   minimum_separation longer than its DEADLINE period.
+ */
+export interface ITimeBasedFilterQosPolicy extends IQosPolicy {
+  readonly minimum_separation: IDuration_t;
+}
+
+export class TimeBasedFilterQosPolicy implements ITimeBasedFilterQosPolicy {
+  readonly metaClass = "TimeBasedFilterQosPolicy" as const;
+  readonly name = "TimeBasedFilter" as const;
+  readonly minimum_separation: IDuration_t;
+  constructor(data: { minimum_separation: IDuration_t }) {
+    this.minimum_separation = data.minimum_separation;
+  }
+}
+
+// ─── 58. PartitionQosPolicy (§2.2.3.13) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.13
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Set of strings that introduces a logical partition among the
+ *   topics visible by the Publisher and Subscriber. A DataWriter within a
+ *   Publisher only communicates with a DataReader in a Subscriber if (in
+ *   addition to matching the Topic and having compatible QoS) the
+ *   Publisher and Subscriber have a common partition name string. The
+ *   empty string ("") is considered a valid partition that is matched with
+ *   other partition names using the same rules of string matching and
+ *   regular-expression matching used for any other partition name (see
+ *   2.2.3.13). The default value for the PARTITION QoS is a zero-length
+ *   sequence. The zero-length sequence is treated as a special value
+ *   equivalent to a sequence containing a single element consisting of the
+ *   empty string.
+ * @ownedAttributes
+ *   name : sequence<string> [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.13)
+ * @operations
+ *   (none declared in §2.2.3.13)
+ * @constraints
+ *   Concerns: Publisher, Subscriber
+ *   RxO: No
+ *   Changeable: Yes
+ *
+ *   NOTE: the §2.2.3.13 owned attribute "name : sequence<string>" shadows
+ *   the inherited QosPolicy.name : string. The inherited QosPolicy-level
+ *   name (the QoS-policy identifier "Partition") is surfaced here as the
+ *   inherited `name` field on the IQosPolicy supertype, while the policy's
+ *   own owned attribute (the list of partition strings) is exposed as
+ *   `partitionNames` to avoid collision.
+ */
+export interface IPartitionQosPolicy extends IQosPolicy {
+  readonly partitionNames: ReadonlyArray<string>;
+}
+
+export class PartitionQosPolicy implements IPartitionQosPolicy {
+  readonly metaClass = "PartitionQosPolicy" as const;
+  readonly name = "Partition" as const;
+  readonly partitionNames: ReadonlyArray<string>;
+  constructor(data: { partitionNames: ReadonlyArray<string> }) {
+    this.partitionNames = data.partitionNames;
+  }
+}
+
+// ─── 59. ReliabilityQosPolicyKind (§2.2.3.14 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.14
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition ReliabilityQosPolicyKind is the closed enumeration of the
+ *   possible RELIABILITY kinds. Per the §2.2.3.14 summary table:
+ *   BEST_EFFORT — Indicates that it is acceptable to not retry propagation
+ *   of any samples. Presumably new values for the samples are generated
+ *   often enough that it is not necessary to re-send or acknowledge any
+ *   samples. This is the default value for DataReaders and Topics;
+ *   RELIABLE — Specifies the Service will attempt to deliver all samples
+ *   in its history. Missed samples may be retried. In steady-state (no
+ *   modifications communicated via the DataWriter) the middleware
+ *   guarantees that all samples in the DataWriter history will eventually
+ *   be delivered to all the DataReader objects. This is the default value
+ *   for DataWriters.
+ * @constraints
+ *   For the purposes of the offered/requested compatibility inequality the
+ *   values are ordered such that BEST_EFFORT < RELIABLE.
+ */
+export const RELIABILITY_QOS_POLICY_KIND = {
+  BEST_EFFORT_RELIABILITY_QOS: "BEST_EFFORT_RELIABILITY_QOS",
+  RELIABLE_RELIABILITY_QOS: "RELIABLE_RELIABILITY_QOS",
+} as const;
+export type ReliabilityQosPolicyKind =
+  typeof RELIABILITY_QOS_POLICY_KIND[keyof typeof RELIABILITY_QOS_POLICY_KIND];
+
+// ─── 60. ReliabilityQosPolicy (§2.2.3.14) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.14
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Indicates the level of reliability offered/requested by the
+ *   Service. The value of the max_blocking_time indicates the maximum time
+ *   the operation DataWriter::write is allowed to block if the DataWriter
+ *   does not have space to store the value written. The default
+ *   max_blocking_time = 100ms.
+ * @ownedAttributes
+ *   kind : ReliabilityQosPolicyKind [1]
+ *   max_blocking_time : Duration_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.14)
+ * @operations
+ *   (none declared in §2.2.3.14)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: Yes
+ *   Changeable: No
+ *   The value offered is considered compatible with the value requested if
+ *   and only if the inequality "offered kind >= requested kind" evaluates
+ *   to `TRUE.' For the purposes of this inequality, the values of
+ *   RELIABILITY kind are considered ordered such that
+ *   BEST_EFFORT < RELIABLE. The default kind is BEST_EFFORT for
+ *   DataReaders and Topics, and RELIABLE for DataWriters.
+ */
+export interface IReliabilityQosPolicy extends IQosPolicy {
+  readonly kind: ReliabilityQosPolicyKind;
+  readonly max_blocking_time: IDuration_t;
+}
+
+export class ReliabilityQosPolicy implements IReliabilityQosPolicy {
+  readonly metaClass = "ReliabilityQosPolicy" as const;
+  readonly name = "Reliability" as const;
+  readonly kind: ReliabilityQosPolicyKind;
+  readonly max_blocking_time: IDuration_t;
+  constructor(data: {
+    kind: ReliabilityQosPolicyKind;
+    max_blocking_time: IDuration_t;
+  }) {
+    this.kind = data.kind;
+    this.max_blocking_time = data.max_blocking_time;
+  }
+}
+
+// ─── 61. DestinationOrderQosPolicyKind (§2.2.3.17 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.17
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition DestinationOrderQosPolicyKind is the closed enumeration of
+ *   the possible DESTINATION_ORDER kinds. Per the §2.2.3.17 summary table:
+ *   BY_RECEPTION_TIMESTAMP (the default) — Indicates that data is ordered
+ *   based on the reception time at each Subscriber. Since each subscriber
+ *   may receive the data at different times there is no guaranteed that
+ *   the changes will be seen in the same order. Consequently, it is
+ *   possible for each subscriber to end up with a different final value
+ *   for the data;
+ *   BY_SOURCE_TIMESTAMP — Indicates that data is ordered based on a
+ *   timestamp placed at the source (by the Service or by the application).
+ *   In any case this guarantees a consistent final value for the data in
+ *   all subscribers.
+ * @constraints
+ *   For the purposes of the offered/requested compatibility inequality the
+ *   values are ordered such that
+ *   BY_RECEPTION_TIMESTAMP < BY_SOURCE_TIMESTAMP.
+ */
+export const DESTINATION_ORDER_QOS_POLICY_KIND = {
+  BY_RECEPTION_TIMESTAMP_DESTINATIONORDER_QOS:
+    "BY_RECEPTION_TIMESTAMP_DESTINATIONORDER_QOS",
+  BY_SOURCE_TIMESTAMP_DESTINATIONORDER_QOS:
+    "BY_SOURCE_TIMESTAMP_DESTINATIONORDER_QOS",
+} as const;
+export type DestinationOrderQosPolicyKind =
+  typeof DESTINATION_ORDER_QOS_POLICY_KIND[keyof typeof DESTINATION_ORDER_QOS_POLICY_KIND];
+
+// ─── 62. DestinationOrderQosPolicy (§2.2.3.17) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.17
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Controls the criteria used to determine the logical order
+ *   among changes made by Publisher entities to the same instance of data
+ *   (i.e., matching Topic and key). The default kind is
+ *   BY_RECEPTION_TIMESTAMP.
+ * @ownedAttributes
+ *   kind : DestinationOrderQosPolicyKind [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.17)
+ * @operations
+ *   (none declared in §2.2.3.17)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: Yes
+ *   Changeable: No
+ *   The value offered is considered compatible with the value requested if
+ *   and only if the inequality "offered kind >= requested kind" evaluates
+ *   to `TRUE.' For the purposes of this inequality, the values of
+ *   DESTINATION_ORDER kind are considered ordered such that
+ *   BY_RECEPTION_TIMESTAMP < BY_SOURCE_TIMESTAMP.
+ */
+export interface IDestinationOrderQosPolicy extends IQosPolicy {
+  readonly kind: DestinationOrderQosPolicyKind;
+}
+
+export class DestinationOrderQosPolicy implements IDestinationOrderQosPolicy {
+  readonly metaClass = "DestinationOrderQosPolicy" as const;
+  readonly name = "DestinationOrder" as const;
+  readonly kind: DestinationOrderQosPolicyKind;
+  constructor(data: { kind: DestinationOrderQosPolicyKind }) {
+    this.kind = data.kind;
+  }
+}
+
+// ─── 63. HistoryQosPolicyKind (§2.2.3.18 — DCPS IDL `enum`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.18
+ * @metaclass enumeration
+ * @generalization (root)
+ * @definition HistoryQosPolicyKind is the closed enumeration of the
+ *   possible HISTORY kinds. Per the §2.2.3.18 summary table:
+ *   KEEP_LAST (the default) — On the publishing side, the Service will
+ *   only attempt to keep the most recent "depth" samples of each instance
+ *   of data (identified by its key) managed by the DataWriter. On the
+ *   subscribing side, the DataReader will only attempt to keep the most
+ *   recent "depth" samples received for each instance (identified by its
+ *   key) until the application "takes" them via the DataReader's take
+ *   operation;
+ *   KEEP_ALL — On the publishing side, the Service will attempt to keep
+ *   all samples (representing each value written) of each instance of data
+ *   (identified by its key) managed by the DataWriter until they can be
+ *   delivered to all subscribers. On the subscribing side, the Service
+ *   will attempt to keep all samples of each instance of data (identified
+ *   by its key) managed by the DataReader. These samples are kept until
+ *   the application "takes" them from the Service via the take operation.
+ *   The setting of depth has no effect. Its implied value is
+ *   LENGTH_UNLIMITED.
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3.18 for the kind enumeration alone —
+ *   compatibility is governed by the HistoryQosPolicy summary row.)
+ */
+export const HISTORY_QOS_POLICY_KIND = {
+  KEEP_LAST_HISTORY_QOS: "KEEP_LAST_HISTORY_QOS",
+  KEEP_ALL_HISTORY_QOS: "KEEP_ALL_HISTORY_QOS",
+} as const;
+export type HistoryQosPolicyKind =
+  typeof HISTORY_QOS_POLICY_KIND[keyof typeof HISTORY_QOS_POLICY_KIND];
+
+// ─── 64. HistoryQosPolicy (§2.2.3.18) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.18
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Specifies the behavior of the Service in the case where the
+ *   value of a sample changes (one or more times) before it can be
+ *   successfully communicated to one or more existing subscribers. This
+ *   QoS policy controls whether the Service should deliver only the most
+ *   recent value, attempt to deliver all intermediate values, or do
+ *   something in between. On the publishing side this policy controls the
+ *   samples that should be maintained by the DataWriter on behalf of
+ *   existing DataReader entities. The behavior with regards to a
+ *   DataReader entities discovered after a sample is written is controlled
+ *   by the DURABILITY QoS policy. On the subscribing side it controls the
+ *   samples that should be maintained until the application "takes" them
+ *   from the Service.
+ * @ownedAttributes
+ *   kind : HistoryQosPolicyKind [1]
+ *   depth : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.18)
+ * @operations
+ *   (none declared in §2.2.3.18)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: No
+ *   Changeable: No
+ *   KEEP_LAST is the default kind. The default value of depth is 1. If a
+ *   value other than 1 is specified, it should be consistent with the
+ *   settings of the RESOURCE_LIMITS QoS policy. With KEEP_ALL the setting
+ *   of depth has no effect (its implied value is LENGTH_UNLIMITED).
+ */
+export interface IHistoryQosPolicy extends IQosPolicy {
+  readonly kind: HistoryQosPolicyKind;
+  readonly depth: number;
+}
+
+export class HistoryQosPolicy implements IHistoryQosPolicy {
+  readonly metaClass = "HistoryQosPolicy" as const;
+  readonly name = "History" as const;
+  readonly kind: HistoryQosPolicyKind;
+  readonly depth: number;
+  constructor(data: { kind: HistoryQosPolicyKind; depth: number }) {
+    this.kind = data.kind;
+    this.depth = data.depth;
+  }
+}
+
+// ─── 65. ResourceLimitsQosPolicy (§2.2.3.19) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.19
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Specifies the resources that the Service can consume in
+ *   order to meet the requested QoS.
+ *   max_samples — Specifies the maximum number of data-samples the
+ *   DataWriter (or DataReader) can manage across all the instances
+ *   associated with it. Represents the maximum samples the middleware can
+ *   store for any one DataWriter (or DataReader). It is inconsistent for
+ *   this value to be less than max_samples_per_instance. By default,
+ *   LENGTH_UNLIMITED.
+ *   max_instances — Represents the maximum number of instances DataWriter
+ *   (or DataReader) can manage. By default, LENGTH_UNLIMITED.
+ *   max_samples_per_instance — Represents the maximum number of samples
+ *   of any one instance a DataWriter (or DataReader) can manage. It is
+ *   inconsistent for this value to be greater than max_samples. By
+ *   default, LENGTH_UNLIMITED.
+ *   The DCPS IDL declares the constant `LENGTH_UNLIMITED = -1` as the
+ *   sentinel for "unlimited."
+ * @ownedAttributes
+ *   max_samples : long [1]
+ *   max_instances : long [1]
+ *   max_samples_per_instance : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.19)
+ * @operations
+ *   (none declared in §2.2.3.19)
+ * @constraints
+ *   Concerns: Topic, DataReader, DataWriter
+ *   RxO: No
+ *   Changeable: No
+ *   It is inconsistent for max_samples < max_samples_per_instance.
+ *   It is inconsistent for max_samples_per_instance > max_samples.
+ */
+export interface IResourceLimitsQosPolicy extends IQosPolicy {
+  readonly max_samples: number;
+  readonly max_instances: number;
+  readonly max_samples_per_instance: number;
+}
+
+export class ResourceLimitsQosPolicy implements IResourceLimitsQosPolicy {
+  readonly metaClass = "ResourceLimitsQosPolicy" as const;
+  readonly name = "ResourceLimits" as const;
+  readonly max_samples: number;
+  readonly max_instances: number;
+  readonly max_samples_per_instance: number;
+  constructor(data: {
+    max_samples: number;
+    max_instances: number;
+    max_samples_per_instance: number;
+  }) {
+    this.max_samples = data.max_samples;
+    this.max_instances = data.max_instances;
+    this.max_samples_per_instance = data.max_samples_per_instance;
+  }
+}
+
+/** DDS 1.4 §2.2.3.19 — `const long LENGTH_UNLIMITED = -1;` (DCPS IDL).
+ *  Sentinel value for the ResourceLimitsQosPolicy and DurabilityServiceQosPolicy
+ *  long-typed limits when the application does not wish to bound the
+ *  resource. */
+export const LENGTH_UNLIMITED = -1;
+
+// ─── 66. EntityFactoryQosPolicy (§2.2.3.20) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.20
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Controls the behavior of the entity when acting as a factory
+ *   for other entities. In other words, configures the side-effects of
+ *   the create_* and delete_* operations. Specifies whether the entity
+ *   acting as a factory automatically enables the instances it creates.
+ *   If autoenable_created_entities == TRUE the factory will automatically
+ *   enable each created Entity otherwise it will not. By default, TRUE.
+ * @ownedAttributes
+ *   autoenable_created_entities : boolean [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.20)
+ * @operations
+ *   (none declared in §2.2.3.20)
+ * @constraints
+ *   Concerns: DomainParticipantFactory, DomainParticipant, Publisher,
+ *             Subscriber
+ *   RxO: No
+ *   Changeable: Yes
+ */
+export interface IEntityFactoryQosPolicy extends IQosPolicy {
+  readonly autoenable_created_entities: boolean;
+}
+
+export class EntityFactoryQosPolicy implements IEntityFactoryQosPolicy {
+  readonly metaClass = "EntityFactoryQosPolicy" as const;
+  readonly name = "EntityFactory" as const;
+  readonly autoenable_created_entities: boolean;
+  constructor(data: { autoenable_created_entities: boolean }) {
+    this.autoenable_created_entities = data.autoenable_created_entities;
+  }
+}
+
+// ─── 67. WriterDataLifecycleQosPolicy (§2.2.3.21) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.21
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Specifies the behavior of the DataWriter with regards to the
+ *   lifecycle of the data-instances it manages. Controls whether a
+ *   DataWriter will automatically dispose instances each time they are
+ *   unregistered. The setting autodispose_unregistered_instances = TRUE
+ *   indicates that unregistered instances will also be considered
+ *   disposed. By default, TRUE.
+ * @ownedAttributes
+ *   autodispose_unregistered_instances : boolean [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.21)
+ * @operations
+ *   (none declared in §2.2.3.21)
+ * @constraints
+ *   Concerns: DataWriter
+ *   RxO: N/A
+ *   Changeable: Yes
+ */
+export interface IWriterDataLifecycleQosPolicy extends IQosPolicy {
+  readonly autodispose_unregistered_instances: boolean;
+}
+
+export class WriterDataLifecycleQosPolicy
+  implements IWriterDataLifecycleQosPolicy {
+  readonly metaClass = "WriterDataLifecycleQosPolicy" as const;
+  readonly name = "WriterDataLifecycle" as const;
+  readonly autodispose_unregistered_instances: boolean;
+  constructor(data: { autodispose_unregistered_instances: boolean }) {
+    this.autodispose_unregistered_instances =
+      data.autodispose_unregistered_instances;
+  }
+}
+
+// ─── 68. ReaderDataLifecycleQosPolicy (§2.2.3.22) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.22
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition Specifies the behavior of the DataReader with regards to the
+ *   lifecycle of the data-instances it manages.
+ *   autopurge_nowriter_samples_delay — Indicates the duration the
+ *   DataReader must retain information regarding instances that have the
+ *   instance_state NOT_ALIVE_NO_WRITERS. By default, infinite.
+ *   autopurge_disposed_samples_delay — Indicates the duration the
+ *   DataReader must retain information regarding instances that have the
+ *   instance_state NOT_ALIVE_DISPOSED. By default, infinite.
+ * @ownedAttributes
+ *   autopurge_nowriter_samples_delay : Duration_t [1]
+ *   autopurge_disposed_samples_delay : Duration_t [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.22)
+ * @operations
+ *   (none declared in §2.2.3.22)
+ * @constraints
+ *   Concerns: DataReader
+ *   RxO: N/A
+ *   Changeable: Yes
+ */
+export interface IReaderDataLifecycleQosPolicy extends IQosPolicy {
+  readonly autopurge_nowriter_samples_delay: IDuration_t;
+  readonly autopurge_disposed_samples_delay: IDuration_t;
+}
+
+export class ReaderDataLifecycleQosPolicy
+  implements IReaderDataLifecycleQosPolicy {
+  readonly metaClass = "ReaderDataLifecycleQosPolicy" as const;
+  readonly name = "ReaderDataLifecycle" as const;
+  readonly autopurge_nowriter_samples_delay: IDuration_t;
+  readonly autopurge_disposed_samples_delay: IDuration_t;
+  constructor(data: {
+    autopurge_nowriter_samples_delay: IDuration_t;
+    autopurge_disposed_samples_delay: IDuration_t;
+  }) {
+    this.autopurge_nowriter_samples_delay =
+      data.autopurge_nowriter_samples_delay;
+    this.autopurge_disposed_samples_delay =
+      data.autopurge_disposed_samples_delay;
+  }
+}
+
+// ─── 69. DurabilityServiceQosPolicy (§2.2.3.5) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3.5
+ * @metaclass concrete
+ * @generalization IQosPolicy
+ * @definition This policy is used to configure the HISTORY QoS and the
+ *   RESOURCE_LIMITS QoS used by the fictitious DataReader and DataWriter
+ *   used by the "persistence service." The "persistence service" is the
+ *   one responsible for implementing the DURABILITY kinds TRANSIENT and
+ *   PERSISTENCE (see 2.2.3.4). Specifies the configuration of the
+ *   durability service. That is, the service that implements the
+ *   DURABILITY kind of TRANSIENT and PERSISTENT.
+ *   service_cleanup_delay — Control when the service is able to remove
+ *   all information regarding a data-instance. By default, zero.
+ *   history_kind, history_depth — Controls the HISTORY QoS of the
+ *   fictitious DataReader that stores the data within the durability
+ *   service (see 2.2.3.4, DURABILITY). The default settings are
+ *   history_kind = KEEP_LAST, history_depth = 1.
+ *   max_samples, max_instances, max_samples_per_instance — Control the
+ *   RESOURCE_LIMITS QoS of the implied DataReader that stores the data
+ *   within the durability service. By default they are all
+ *   LENGTH_UNLIMITED.
+ * @ownedAttributes
+ *   service_cleanup_delay : Duration_t [1]
+ *   history_kind : HistoryQosPolicyKind [1]
+ *   history_depth : long [1]
+ *   max_samples : long [1]
+ *   max_instances : long [1]
+ *   max_samples_per_instance : long [1]
+ * @associationEnds
+ *   (none declared in §2.2.3.5)
+ * @operations
+ *   (none declared in §2.2.3.5)
+ * @constraints
+ *   Concerns: Topic, DataWriter
+ *   RxO: No
+ *   Changeable: No
+ */
+export interface IDurabilityServiceQosPolicy extends IQosPolicy {
+  readonly service_cleanup_delay: IDuration_t;
+  readonly history_kind: HistoryQosPolicyKind;
+  readonly history_depth: number;
+  readonly max_samples: number;
+  readonly max_instances: number;
+  readonly max_samples_per_instance: number;
+}
+
+export class DurabilityServiceQosPolicy implements IDurabilityServiceQosPolicy {
+  readonly metaClass = "DurabilityServiceQosPolicy" as const;
+  readonly name = "DurabilityService" as const;
+  readonly service_cleanup_delay: IDuration_t;
+  readonly history_kind: HistoryQosPolicyKind;
+  readonly history_depth: number;
+  readonly max_samples: number;
+  readonly max_instances: number;
+  readonly max_samples_per_instance: number;
+  constructor(data: {
+    service_cleanup_delay: IDuration_t;
+    history_kind: HistoryQosPolicyKind;
+    history_depth: number;
+    max_samples: number;
+    max_instances: number;
+    max_samples_per_instance: number;
+  }) {
+    this.service_cleanup_delay = data.service_cleanup_delay;
+    this.history_kind = data.history_kind;
+    this.history_depth = data.history_depth;
+    this.max_samples = data.max_samples;
+    this.max_instances = data.max_instances;
+    this.max_samples_per_instance = data.max_samples_per_instance;
+  }
+}
+
+// ─── 70. DomainParticipantFactoryQos (§2.2.3 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass concrete (Qos bundle)
+ * @generalization (root)
+ * @definition The bundle of QosPolicy values applicable to a
+ *   DomainParticipantFactory. Per DCPS IDL `struct DomainParticipantFactoryQos`
+ *   the bundle carries exactly one EntityFactoryQosPolicy.
+ * @ownedAttributes
+ *   entity_factory : EntityFactoryQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 beyond the per-policy constraints
+ *   declared on EntityFactoryQosPolicy)
+ */
+export interface IDomainParticipantFactoryQos {
+  readonly entity_factory: IEntityFactoryQosPolicy;
+}
+
+export class DomainParticipantFactoryQos
+  implements IDomainParticipantFactoryQos {
+  readonly metaClass = "DomainParticipantFactoryQos" as const;
+  readonly entity_factory: IEntityFactoryQosPolicy;
+  constructor(data: { entity_factory: IEntityFactoryQosPolicy }) {
+    this.entity_factory = data.entity_factory;
+  }
+}
+
+// ─── 71. DomainParticipantQos (§2.2.3 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass concrete (Qos bundle)
+ * @generalization (root)
+ * @definition The bundle of QosPolicy values applicable to a
+ *   DomainParticipant. Per DCPS IDL `struct DomainParticipantQos` the
+ *   bundle carries one UserDataQosPolicy and one EntityFactoryQosPolicy.
+ * @ownedAttributes
+ *   user_data : UserDataQosPolicy [1]
+ *   entity_factory : EntityFactoryQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 beyond the per-policy constraints
+ *   declared on UserDataQosPolicy and EntityFactoryQosPolicy)
+ */
+export interface IDomainParticipantQos {
+  readonly user_data: IUserDataQosPolicy;
+  readonly entity_factory: IEntityFactoryQosPolicy;
+}
+
+export class DomainParticipantQos implements IDomainParticipantQos {
+  readonly metaClass = "DomainParticipantQos" as const;
+  readonly user_data: IUserDataQosPolicy;
+  readonly entity_factory: IEntityFactoryQosPolicy;
+  constructor(data: {
+    user_data: IUserDataQosPolicy;
+    entity_factory: IEntityFactoryQosPolicy;
+  }) {
+    this.user_data = data.user_data;
+    this.entity_factory = data.entity_factory;
+  }
+}
+
+// ─── 72. TopicQos (§2.2.3 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass concrete (Qos bundle)
+ * @generalization (root)
+ * @definition The bundle of QosPolicy values applicable to a Topic. Per
+ *   DCPS IDL `struct TopicQos` the bundle carries TopicData, Durability,
+ *   DurabilityService, Deadline, LatencyBudget, Liveliness, Reliability,
+ *   DestinationOrder, History, ResourceLimits, TransportPriority,
+ *   Lifespan, and Ownership policies.
+ * @ownedAttributes
+ *   topic_data : TopicDataQosPolicy [1]
+ *   durability : DurabilityQosPolicy [1]
+ *   durability_service : DurabilityServiceQosPolicy [1]
+ *   deadline : DeadlineQosPolicy [1]
+ *   latency_budget : LatencyBudgetQosPolicy [1]
+ *   liveliness : LivelinessQosPolicy [1]
+ *   reliability : ReliabilityQosPolicy [1]
+ *   destination_order : DestinationOrderQosPolicy [1]
+ *   history : HistoryQosPolicy [1]
+ *   resource_limits : ResourceLimitsQosPolicy [1]
+ *   transport_priority : TransportPriorityQosPolicy [1]
+ *   lifespan : LifespanQosPolicy [1]
+ *   ownership : OwnershipQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 beyond the per-policy constraints
+ *   declared on each member policy)
+ */
+export interface ITopicQos {
+  readonly topic_data: ITopicDataQosPolicy;
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly transport_priority: ITransportPriorityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+}
+
+export class TopicQos implements ITopicQos {
+  readonly metaClass = "TopicQos" as const;
+  readonly topic_data: ITopicDataQosPolicy;
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly transport_priority: ITransportPriorityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  constructor(data: {
+    topic_data: ITopicDataQosPolicy;
+    durability: IDurabilityQosPolicy;
+    durability_service: IDurabilityServiceQosPolicy;
+    deadline: IDeadlineQosPolicy;
+    latency_budget: ILatencyBudgetQosPolicy;
+    liveliness: ILivelinessQosPolicy;
+    reliability: IReliabilityQosPolicy;
+    destination_order: IDestinationOrderQosPolicy;
+    history: IHistoryQosPolicy;
+    resource_limits: IResourceLimitsQosPolicy;
+    transport_priority: ITransportPriorityQosPolicy;
+    lifespan: ILifespanQosPolicy;
+    ownership: IOwnershipQosPolicy;
+  }) {
+    this.topic_data = data.topic_data;
+    this.durability = data.durability;
+    this.durability_service = data.durability_service;
+    this.deadline = data.deadline;
+    this.latency_budget = data.latency_budget;
+    this.liveliness = data.liveliness;
+    this.reliability = data.reliability;
+    this.destination_order = data.destination_order;
+    this.history = data.history;
+    this.resource_limits = data.resource_limits;
+    this.transport_priority = data.transport_priority;
+    this.lifespan = data.lifespan;
+    this.ownership = data.ownership;
+  }
+}
+
+// ─── 73. PublisherQos (§2.2.3 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass concrete (Qos bundle)
+ * @generalization (root)
+ * @definition The bundle of QosPolicy values applicable to a Publisher.
+ *   Per DCPS IDL `struct PublisherQos` the bundle carries Presentation,
+ *   Partition, GroupData, and EntityFactory policies.
+ * @ownedAttributes
+ *   presentation : PresentationQosPolicy [1]
+ *   partition : PartitionQosPolicy [1]
+ *   group_data : GroupDataQosPolicy [1]
+ *   entity_factory : EntityFactoryQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 beyond the per-policy constraints
+ *   declared on each member policy)
+ */
+export interface IPublisherQos {
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+  readonly entity_factory: IEntityFactoryQosPolicy;
+}
+
+export class PublisherQos implements IPublisherQos {
+  readonly metaClass = "PublisherQos" as const;
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+  readonly entity_factory: IEntityFactoryQosPolicy;
+  constructor(data: {
+    presentation: IPresentationQosPolicy;
+    partition: IPartitionQosPolicy;
+    group_data: IGroupDataQosPolicy;
+    entity_factory: IEntityFactoryQosPolicy;
+  }) {
+    this.presentation = data.presentation;
+    this.partition = data.partition;
+    this.group_data = data.group_data;
+    this.entity_factory = data.entity_factory;
+  }
+}
+
+// ─── 74. SubscriberQos (§2.2.3 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass concrete (Qos bundle)
+ * @generalization (root)
+ * @definition The bundle of QosPolicy values applicable to a Subscriber.
+ *   Per DCPS IDL `struct SubscriberQos` the bundle carries Presentation,
+ *   Partition, GroupData, and EntityFactory policies.
+ * @ownedAttributes
+ *   presentation : PresentationQosPolicy [1]
+ *   partition : PartitionQosPolicy [1]
+ *   group_data : GroupDataQosPolicy [1]
+ *   entity_factory : EntityFactoryQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 beyond the per-policy constraints
+ *   declared on each member policy)
+ */
+export interface ISubscriberQos {
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+  readonly entity_factory: IEntityFactoryQosPolicy;
+}
+
+export class SubscriberQos implements ISubscriberQos {
+  readonly metaClass = "SubscriberQos" as const;
+  readonly presentation: IPresentationQosPolicy;
+  readonly partition: IPartitionQosPolicy;
+  readonly group_data: IGroupDataQosPolicy;
+  readonly entity_factory: IEntityFactoryQosPolicy;
+  constructor(data: {
+    presentation: IPresentationQosPolicy;
+    partition: IPartitionQosPolicy;
+    group_data: IGroupDataQosPolicy;
+    entity_factory: IEntityFactoryQosPolicy;
+  }) {
+    this.presentation = data.presentation;
+    this.partition = data.partition;
+    this.group_data = data.group_data;
+    this.entity_factory = data.entity_factory;
+  }
+}
+
+// ─── 75. DataWriterQos (§2.2.3 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass concrete (Qos bundle)
+ * @generalization (root)
+ * @definition The bundle of QosPolicy values applicable to a DataWriter.
+ *   Per DCPS IDL `struct DataWriterQos` the bundle carries Durability,
+ *   DurabilityService, Deadline, LatencyBudget, Liveliness, Reliability,
+ *   DestinationOrder, History, ResourceLimits, TransportPriority,
+ *   Lifespan, UserData, Ownership, OwnershipStrength, and
+ *   WriterDataLifecycle policies.
+ * @ownedAttributes
+ *   durability : DurabilityQosPolicy [1]
+ *   durability_service : DurabilityServiceQosPolicy [1]
+ *   deadline : DeadlineQosPolicy [1]
+ *   latency_budget : LatencyBudgetQosPolicy [1]
+ *   liveliness : LivelinessQosPolicy [1]
+ *   reliability : ReliabilityQosPolicy [1]
+ *   destination_order : DestinationOrderQosPolicy [1]
+ *   history : HistoryQosPolicy [1]
+ *   resource_limits : ResourceLimitsQosPolicy [1]
+ *   transport_priority : TransportPriorityQosPolicy [1]
+ *   lifespan : LifespanQosPolicy [1]
+ *   user_data : UserDataQosPolicy [1]
+ *   ownership : OwnershipQosPolicy [1]
+ *   ownership_strength : OwnershipStrengthQosPolicy [1]
+ *   writer_data_lifecycle : WriterDataLifecycleQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 beyond the per-policy constraints
+ *   declared on each member policy)
+ */
+export interface IDataWriterQos {
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly transport_priority: ITransportPriorityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly ownership_strength: IOwnershipStrengthQosPolicy;
+  readonly writer_data_lifecycle: IWriterDataLifecycleQosPolicy;
+}
+
+export class DataWriterQos implements IDataWriterQos {
+  readonly metaClass = "DataWriterQos" as const;
+  readonly durability: IDurabilityQosPolicy;
+  readonly durability_service: IDurabilityServiceQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly transport_priority: ITransportPriorityQosPolicy;
+  readonly lifespan: ILifespanQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly ownership_strength: IOwnershipStrengthQosPolicy;
+  readonly writer_data_lifecycle: IWriterDataLifecycleQosPolicy;
+  constructor(data: {
+    durability: IDurabilityQosPolicy;
+    durability_service: IDurabilityServiceQosPolicy;
+    deadline: IDeadlineQosPolicy;
+    latency_budget: ILatencyBudgetQosPolicy;
+    liveliness: ILivelinessQosPolicy;
+    reliability: IReliabilityQosPolicy;
+    destination_order: IDestinationOrderQosPolicy;
+    history: IHistoryQosPolicy;
+    resource_limits: IResourceLimitsQosPolicy;
+    transport_priority: ITransportPriorityQosPolicy;
+    lifespan: ILifespanQosPolicy;
+    user_data: IUserDataQosPolicy;
+    ownership: IOwnershipQosPolicy;
+    ownership_strength: IOwnershipStrengthQosPolicy;
+    writer_data_lifecycle: IWriterDataLifecycleQosPolicy;
+  }) {
+    this.durability = data.durability;
+    this.durability_service = data.durability_service;
+    this.deadline = data.deadline;
+    this.latency_budget = data.latency_budget;
+    this.liveliness = data.liveliness;
+    this.reliability = data.reliability;
+    this.destination_order = data.destination_order;
+    this.history = data.history;
+    this.resource_limits = data.resource_limits;
+    this.transport_priority = data.transport_priority;
+    this.lifespan = data.lifespan;
+    this.user_data = data.user_data;
+    this.ownership = data.ownership;
+    this.ownership_strength = data.ownership_strength;
+    this.writer_data_lifecycle = data.writer_data_lifecycle;
+  }
+}
+
+// ─── 76. DataReaderQos (§2.2.3 — DCPS IDL `struct`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.3
+ * @metaclass concrete (Qos bundle)
+ * @generalization (root)
+ * @definition The bundle of QosPolicy values applicable to a DataReader.
+ *   Per DCPS IDL `struct DataReaderQos` the bundle carries Durability,
+ *   Deadline, LatencyBudget, Liveliness, Reliability, DestinationOrder,
+ *   History, ResourceLimits, UserData, Ownership, TimeBasedFilter, and
+ *   ReaderDataLifecycle policies.
+ * @ownedAttributes
+ *   durability : DurabilityQosPolicy [1]
+ *   deadline : DeadlineQosPolicy [1]
+ *   latency_budget : LatencyBudgetQosPolicy [1]
+ *   liveliness : LivelinessQosPolicy [1]
+ *   reliability : ReliabilityQosPolicy [1]
+ *   destination_order : DestinationOrderQosPolicy [1]
+ *   history : HistoryQosPolicy [1]
+ *   resource_limits : ResourceLimitsQosPolicy [1]
+ *   user_data : UserDataQosPolicy [1]
+ *   ownership : OwnershipQosPolicy [1]
+ *   time_based_filter : TimeBasedFilterQosPolicy [1]
+ *   reader_data_lifecycle : ReaderDataLifecycleQosPolicy [1]
+ * @associationEnds
+ *   (none declared in §2.2.3)
+ * @operations
+ *   (none declared in §2.2.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.3 beyond the per-policy constraints
+ *   declared on each member policy)
+ */
+export interface IDataReaderQos {
+  readonly durability: IDurabilityQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly time_based_filter: ITimeBasedFilterQosPolicy;
+  readonly reader_data_lifecycle: IReaderDataLifecycleQosPolicy;
+}
+
+export class DataReaderQos implements IDataReaderQos {
+  readonly metaClass = "DataReaderQos" as const;
+  readonly durability: IDurabilityQosPolicy;
+  readonly deadline: IDeadlineQosPolicy;
+  readonly latency_budget: ILatencyBudgetQosPolicy;
+  readonly liveliness: ILivelinessQosPolicy;
+  readonly reliability: IReliabilityQosPolicy;
+  readonly destination_order: IDestinationOrderQosPolicy;
+  readonly history: IHistoryQosPolicy;
+  readonly resource_limits: IResourceLimitsQosPolicy;
+  readonly user_data: IUserDataQosPolicy;
+  readonly ownership: IOwnershipQosPolicy;
+  readonly time_based_filter: ITimeBasedFilterQosPolicy;
+  readonly reader_data_lifecycle: IReaderDataLifecycleQosPolicy;
+  constructor(data: {
+    durability: IDurabilityQosPolicy;
+    deadline: IDeadlineQosPolicy;
+    latency_budget: ILatencyBudgetQosPolicy;
+    liveliness: ILivelinessQosPolicy;
+    reliability: IReliabilityQosPolicy;
+    destination_order: IDestinationOrderQosPolicy;
+    history: IHistoryQosPolicy;
+    resource_limits: IResourceLimitsQosPolicy;
+    user_data: IUserDataQosPolicy;
+    ownership: IOwnershipQosPolicy;
+    time_based_filter: ITimeBasedFilterQosPolicy;
+    reader_data_lifecycle: IReaderDataLifecycleQosPolicy;
+  }) {
+    this.durability = data.durability;
+    this.deadline = data.deadline;
+    this.latency_budget = data.latency_budget;
+    this.liveliness = data.liveliness;
+    this.reliability = data.reliability;
+    this.destination_order = data.destination_order;
+    this.history = data.history;
+    this.resource_limits = data.resource_limits;
+    this.user_data = data.user_data;
+    this.ownership = data.ownership;
+    this.time_based_filter = data.time_based_filter;
+    this.reader_data_lifecycle = data.reader_data_lifecycle;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// — END Implementer #3: QoS Policies —
+//
+// Inventory inserted in this section:
+//   • QosPolicyId_t            constants (23 named ids incl. INVALID)
+//   • QosPolicy abstract base  (1 — IQosPolicy interface only)
+//   • Concrete QoS policies    (22 — UserData, TopicData, GroupData,
+//       TransportPriority, Lifespan, Durability, Presentation, Deadline,
+//       LatencyBudget, Ownership, OwnershipStrength, Liveliness,
+//       TimeBasedFilter, Partition, Reliability, DestinationOrder,
+//       History, ResourceLimits, EntityFactory, WriterDataLifecycle,
+//       ReaderDataLifecycle, DurabilityService)
+//   • Kind enumerations        (7 — DurabilityQosPolicyKind,
+//       PresentationQosPolicyAccessScopeKind, OwnershipQosPolicyKind,
+//       LivelinessQosPolicyKind, ReliabilityQosPolicyKind,
+//       DestinationOrderQosPolicyKind, HistoryQosPolicyKind)
+//   • Per-Entity Qos bundles   (7 — DomainParticipantFactoryQos,
+//       DomainParticipantQos, TopicQos, PublisherQos, SubscriberQos,
+//       DataWriterQos, DataReaderQos)
+//
+// Spec ambiguity flagged in this partition:
+//   • PartitionQosPolicy§2.2.3.13 — the §2.2.3.13 owned attribute is named
+//     `name : sequence<string>`, which collides with the inherited
+//     QosPolicy.name : string (Figure 2.12). Surfaced here as
+//     `partitionNames : ReadonlyArray<string>` so the inherited QoS-policy
+//     identifier ("Partition") and the policy's owned attribute can both
+//     coexist.
+//     @section §2.2.3.13
+// ═══════════════════════════════════════════════════════════════════════════
