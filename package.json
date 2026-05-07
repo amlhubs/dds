@@ -1,0 +1,41 @@
+{
+  "name": "@amlhubs/dds",
+  "version": "0.0.0",
+  "description": "OMG Data Distribution Service (DDS) v1.4 (formal/2015-04-10) — extensible TypeScript base classes and interfaces for the DDS metamodel. Pure DDS; downstream consumers extend through TypeScript inheritance.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc --noEmit -p tsconfig.test.json",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amlhubs/dds.git",
+    "directory": "."
+  },
+  "keywords": [
+    "dds",
+    "dds-1.4",
+    "data-distribution-service",
+    "metamodel",
+    "metaclass",
+    "omg",
+    "model-driven",
+    "agentic-modeling-language",
+    "aml",
+    "agenihub"
+  ],
+  "license": "UNLICENSED"
+}
