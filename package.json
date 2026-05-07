@@ -1,6 +1,6 @@
 {
   "name": "@amlhubs/dds",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "OMG Data Distribution Service (DDS) v1.4 (formal/2015-04-10) — extensible TypeScript base classes and interfaces for the DDS metamodel. Pure DDS; downstream consumers extend through TypeScript inheritance.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
