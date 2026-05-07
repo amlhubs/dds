@@ -859,3 +859,991 @@ export class Subscriber implements ISubscriber {
 // ═══════════════════════════════════════════════════════════════════════════
 // — END Implementer #1: DCPS Infrastructure —
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BEGIN Implementer #2: DCPS Communication
+// (DataWriter + DataReader + SampleInfo + InstanceHandle_t +
+//  BuiltinTopicKey_t + Condition / GuardCondition / StatusCondition /
+//  ReadCondition / QueryCondition + WaitSet + ReturnCode_t + Duration_t +
+//  Time_t + SampleStateMask / ViewStateMask / InstanceStateMask)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── 16. ReturnCode_t (§2.3.3 supporting types — `typedef long ReturnCode_t`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass enumeration (closed const-set)
+ * @generalization (root)
+ * @definition Return code values used by every operation that can fail.
+ *   Defined in the DCPS PSM IDL (§2.3.3) as `typedef long ReturnCode_t` plus
+ *   the named const values RETCODE_OK ... RETCODE_ILLEGAL_OPERATION. The PIM
+ *   class diagrams reference ReturnCode_t directly as the operation return
+ *   type for every status-bearing operation.
+ * @ownedAttributes
+ *   (closed enumeration of constant values; see DCPS IDL `typedef long
+ *    ReturnCode_t` and the named const values)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export const RETURN_CODE = {
+  RETCODE_OK: "RETCODE_OK",
+  RETCODE_ERROR: "RETCODE_ERROR",
+  RETCODE_UNSUPPORTED: "RETCODE_UNSUPPORTED",
+  RETCODE_BAD_PARAMETER: "RETCODE_BAD_PARAMETER",
+  RETCODE_PRECONDITION_NOT_MET: "RETCODE_PRECONDITION_NOT_MET",
+  RETCODE_OUT_OF_RESOURCES: "RETCODE_OUT_OF_RESOURCES",
+  RETCODE_NOT_ENABLED: "RETCODE_NOT_ENABLED",
+  RETCODE_IMMUTABLE_POLICY: "RETCODE_IMMUTABLE_POLICY",
+  RETCODE_INCONSISTENT_POLICY: "RETCODE_INCONSISTENT_POLICY",
+  RETCODE_ALREADY_DELETED: "RETCODE_ALREADY_DELETED",
+  RETCODE_TIMEOUT: "RETCODE_TIMEOUT",
+  RETCODE_NO_DATA: "RETCODE_NO_DATA",
+  RETCODE_ILLEGAL_OPERATION: "RETCODE_ILLEGAL_OPERATION",
+} as const;
+export type ReturnCode_t = typeof RETURN_CODE[keyof typeof RETURN_CODE];
+
+// ─── 17. Duration_t (§2.3.3 supporting types — `struct Duration_t`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass concrete (struct)
+ * @generalization (root)
+ * @definition Duration_t is the structured type used to represent a span of
+ *   time. It is composed of a long sec field and an unsigned long nanosec
+ *   field. The DCPS IDL defines pre-defined values DURATION_INFINITE
+ *   (sec = 0x7fffffff, nanosec = 0x7fffffff) and DURATION_ZERO (sec = 0,
+ *   nanosec = 0).
+ * @ownedAttributes
+ *   sec : long [1]
+ *   nanosec : unsigned long [1]
+ * @associationEnds
+ *   (none declared in §2.3.3)
+ * @operations
+ *   (none declared in §2.3.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export interface IDuration_t {
+  readonly sec: number;
+  readonly nanosec: number;
+}
+
+export class Duration_t implements IDuration_t {
+  readonly metaClass = "Duration_t" as const;
+  readonly sec: number;
+  readonly nanosec: number;
+  constructor(data: { sec: number; nanosec: number }) {
+    this.sec = data.sec;
+    this.nanosec = data.nanosec;
+  }
+}
+
+/** DDS 1.4 §2.3.3 — `const long DURATION_INFINITE_SEC = 0x7fffffff;
+ *  const unsigned long DURATION_INFINITE_NSEC = 0x7fffffff;` */
+export const DURATION_INFINITE: IDuration_t = { sec: 0x7fffffff, nanosec: 0x7fffffff };
+
+/** DDS 1.4 §2.3.3 — `const long DURATION_ZERO_SEC = 0;
+ *  const unsigned long DURATION_ZERO_NSEC = 0;` */
+export const DURATION_ZERO: IDuration_t = { sec: 0, nanosec: 0 };
+
+// ─── 18. Time_t (§2.3.3 supporting types — `struct Time_t`) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass concrete (struct)
+ * @generalization (root)
+ * @definition Time_t is the structured type used to represent a moment in
+ *   time. It is composed of a long sec field and an unsigned long nanosec
+ *   field. The DCPS IDL defines a pre-defined value TIME_INVALID
+ *   (sec = -1, nanosec = 0xffffffff).
+ * @ownedAttributes
+ *   sec : long [1]
+ *   nanosec : unsigned long [1]
+ * @associationEnds
+ *   (none declared in §2.3.3)
+ * @operations
+ *   (none declared in §2.3.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export interface ITime_t {
+  readonly sec: number;
+  readonly nanosec: number;
+}
+
+export class Time_t implements ITime_t {
+  readonly metaClass = "Time_t" as const;
+  readonly sec: number;
+  readonly nanosec: number;
+  constructor(data: { sec: number; nanosec: number }) {
+    this.sec = data.sec;
+    this.nanosec = data.nanosec;
+  }
+}
+
+/** DDS 1.4 §2.3.3 — `const long TIME_INVALID_SEC = -1;
+ *  const unsigned long TIME_INVALID_NSEC = 0xffffffff;` */
+export const TIME_INVALID: ITime_t = { sec: -1, nanosec: 0xffffffff };
+
+// ─── 19. InstanceHandle_t (§2.3.3 supporting types) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass concrete (opaque handle)
+ * @generalization (root)
+ * @definition An opaque handle that identifies an instance locally within a
+ *   DDS Service. Defined in the DCPS PSM IDL as
+ *   `typedef HANDLE_TYPE_NATIVE InstanceHandle_t` (with
+ *   HANDLE_TYPE_NATIVE = long). The DCPS IDL defines a pre-defined value
+ *   HANDLE_NIL = HANDLE_NIL_NATIVE (= 0). The special value HANDLE_NIL is
+ *   guaranteed to be `less than' any valid instance_handle (DDS 1.4
+ *   §2.2.2.5.3.16).
+ * @ownedAttributes
+ *   value : long [1]
+ * @associationEnds
+ *   (none declared in §2.3.3)
+ * @operations
+ *   (none declared in §2.3.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export interface IInstanceHandle_t {
+  readonly value: number;
+}
+
+export class InstanceHandle_t implements IInstanceHandle_t {
+  readonly metaClass = "InstanceHandle_t" as const;
+  readonly value: number;
+  constructor(data: { value: number }) {
+    this.value = data.value;
+  }
+}
+
+/** DDS 1.4 §2.3.3 — `const InstanceHandle_t HANDLE_NIL = HANDLE_NIL_NATIVE;`
+ *  (HANDLE_NIL_NATIVE = 0). HANDLE_NIL is guaranteed to be `less than' any
+ *  valid instance_handle. */
+export const HANDLE_NIL: IInstanceHandle_t = { value: 0 };
+
+// ─── 20. BuiltinTopicKey_t (§2.3.3 / §2.3.5) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass concrete (struct)
+ * @generalization (root)
+ * @definition BuiltinTopicKey_t is the structured type used as the DCPS key
+ *   for built-in topic instances (DCPSParticipant, DCPSTopic,
+ *   DCPSPublication, DCPSSubscription). Defined in the DCPS PSM IDL
+ *   (§2.3.3) as `struct BuiltinTopicKey_t { BUILTIN_TOPIC_KEY_TYPE_NATIVE
+ *   value[3]; };` (with BUILTIN_TOPIC_KEY_TYPE_NATIVE = long). The
+ *   ParticipantBuiltinTopicData, TopicBuiltinTopicData,
+ *   PublicationBuiltinTopicData, and SubscriptionBuiltinTopicData
+ *   structures (§2.3.5) all carry one or two BuiltinTopicKey_t fields to
+ *   distinguish entries.
+ * @ownedAttributes
+ *   value : long[3] [1]
+ * @associationEnds
+ *   (none declared in §2.3.3)
+ * @operations
+ *   (none declared in §2.3.3)
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export interface IBuiltinTopicKey_t {
+  readonly value: readonly [number, number, number];
+}
+
+export class BuiltinTopicKey_t implements IBuiltinTopicKey_t {
+  readonly metaClass = "BuiltinTopicKey_t" as const;
+  readonly value: readonly [number, number, number];
+  constructor(data: { value: readonly [number, number, number] }) {
+    this.value = data.value;
+  }
+}
+
+// ─── 21. SampleStateMask (§2.3.3 / §2.2.2.5.1.2) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass alias (bit-mask of SampleStateKind)
+ * @generalization (root)
+ * @definition SampleStateMask is the bit-mask form of SampleStateKind. The
+ *   DCPS PSM IDL defines `typedef unsigned long SampleStateMask` plus the
+ *   pre-defined constant `ANY_SAMPLE_STATE = 0xffff`. At the PIM level it is
+ *   a sequence of SampleStateKind literals (READ_SAMPLE_STATE,
+ *   NOT_READ_SAMPLE_STATE) consumed by DataReader::read,
+ *   DataReader::take, and ReadCondition.
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export type SampleStateMask = ReadonlyArray<SampleStateKind>;
+
+/** DDS 1.4 §2.3.3 — `const SampleStateMask ANY_SAMPLE_STATE = 0xffff;`
+ *  PIM projection: the union of every SampleStateKind literal. */
+export const ANY_SAMPLE_STATE: SampleStateMask = [
+  SAMPLE_STATE_KIND.READ_SAMPLE_STATE,
+  SAMPLE_STATE_KIND.NOT_READ_SAMPLE_STATE,
+];
+
+// ─── 22. ViewStateMask (§2.3.3 / §2.2.2.5.1.8) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass alias (bit-mask of ViewStateKind)
+ * @generalization (root)
+ * @definition ViewStateMask is the bit-mask form of ViewStateKind. The DCPS
+ *   PSM IDL defines `typedef unsigned long ViewStateMask` plus the pre-
+ *   defined constant `ANY_VIEW_STATE = 0xffff`. At the PIM level it is a
+ *   sequence of ViewStateKind literals (NEW_VIEW_STATE, NOT_NEW_VIEW_STATE)
+ *   consumed by DataReader::read, DataReader::take, and ReadCondition.
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export type ViewStateMask = ReadonlyArray<ViewStateKind>;
+
+/** DDS 1.4 §2.3.3 — `const ViewStateMask ANY_VIEW_STATE = 0xffff;`
+ *  PIM projection: the union of every ViewStateKind literal. */
+export const ANY_VIEW_STATE: ViewStateMask = [
+  VIEW_STATE_KIND.NEW_VIEW_STATE,
+  VIEW_STATE_KIND.NOT_NEW_VIEW_STATE,
+];
+
+// ─── 23. InstanceStateMask (§2.3.3 / §2.2.2.5.1.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.3.3
+ * @metaclass alias (bit-mask of InstanceStateKind)
+ * @generalization (root)
+ * @definition InstanceStateMask is the bit-mask form of InstanceStateKind.
+ *   The DCPS PSM IDL defines `typedef unsigned long InstanceStateMask` plus
+ *   the pre-defined constants `ANY_INSTANCE_STATE = 0xffff` and
+ *   `NOT_ALIVE_INSTANCE_STATE = 0x006`. At the PIM level it is a sequence
+ *   of InstanceStateKind literals consumed by DataReader::read,
+ *   DataReader::take, and ReadCondition.
+ * @constraints
+ *   (none declared in DDS 1.4 §2.3.3)
+ */
+export type InstanceStateMask = ReadonlyArray<InstanceStateKind>;
+
+/** DDS 1.4 §2.3.3 — `const InstanceStateMask ANY_INSTANCE_STATE = 0xffff;`
+ *  PIM projection: the union of every InstanceStateKind literal. */
+export const ANY_INSTANCE_STATE: InstanceStateMask = [
+  INSTANCE_STATE_KIND.ALIVE_INSTANCE_STATE,
+  INSTANCE_STATE_KIND.NOT_ALIVE_DISPOSED_INSTANCE_STATE,
+  INSTANCE_STATE_KIND.NOT_ALIVE_NO_WRITERS_INSTANCE_STATE,
+];
+
+/** DDS 1.4 §2.3.3 — `const InstanceStateMask NOT_ALIVE_INSTANCE_STATE = 0x006;`
+ *  PIM projection: the two NOT_ALIVE_* literals (DISPOSED + NO_WRITERS). */
+export const NOT_ALIVE_INSTANCE_STATE: InstanceStateMask = [
+  INSTANCE_STATE_KIND.NOT_ALIVE_DISPOSED_INSTANCE_STATE,
+  INSTANCE_STATE_KIND.NOT_ALIVE_NO_WRITERS_INSTANCE_STATE,
+];
+
+// ─── 24. ICondition (§2.2.2.1.7) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.1.7
+ * @metaclass concrete (root of the Condition hierarchy)
+ * @generalization (root)
+ * @definition A Condition is a root class for all the conditions that may be
+ *   attached to a WaitSet. This basic class is specialized in three classes
+ *   that are known by the middleware: GuardCondition (2.2.2.1.8),
+ *   StatusCondition (2.2.2.1.9), and ReadCondition (2.2.2.5.8). A Condition
+ *   has a trigger_value that can be TRUE or FALSE and is set automatically
+ *   by the Service.
+ * @ownedAttributes
+ *   (none declared in §2.2.2.1.7; trigger_value is read-only via
+ *    get_trigger_value)
+ * @associationEnds
+ *   (none declared in §2.2.2.1.7)
+ * @operations
+ *   get_trigger_value() : Boolean
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.2.1.7)
+ */
+export interface ICondition {
+  // -- Operations --
+  getTriggerValue(): boolean;
+}
+
+export class Condition implements ICondition {
+  readonly metaClass = "Condition" as const;
+  getTriggerValue(): boolean { return false; }
+}
+
+// ─── 25. IGuardCondition (§2.2.2.1.8) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.1.8
+ * @metaclass concrete
+ * @generalization ICondition
+ * @definition A GuardCondition object is a specific Condition whose
+ *   trigger_value is completely under the control of the application.
+ *   GuardCondition has no factory. It is created as an object directly by
+ *   the natural means in each language binding (e.g., using "new" in C++ or
+ *   Java. When first created the trigger_value is set to FALSE. The purpose
+ *   of the GuardCondition is to provide the means for the application to
+ *   manually wakeup a WaitSet. This is accomplished by attaching the
+ *   GuardCondition to the WaitSet and then setting the trigger_value by
+ *   means of the set_trigger_value operation.
+ * @ownedAttributes
+ *   (none declared in §2.2.2.1.8; trigger_value is mutable via
+ *    set_trigger_value)
+ * @associationEnds
+ *   (none declared in §2.2.2.1.8)
+ * @operations
+ *   set_trigger_value(value : Boolean) : ReturnCode_t
+ * @constraints
+ *   [initial_trigger_value]: When first created the trigger_value is set to
+ *     FALSE. (DDS 1.4 §2.2.2.1.8)
+ *   [waitset_observation]: WaitSet objects behavior depends on the changes of
+ *     the trigger_value of their attached conditions. Therefore, any WaitSet
+ *     to which is attached the GuardCondition is potentially affected by
+ *     this operation. (DDS 1.4 §2.2.2.1.8.1)
+ */
+export interface IGuardCondition extends ICondition {
+  // -- Operations --
+  setTriggerValue(value: boolean): ReturnCode_t;
+}
+
+export class GuardCondition implements IGuardCondition {
+  readonly metaClass = "GuardCondition" as const;
+  getTriggerValue(): boolean { return false; }
+  setTriggerValue(_value: boolean): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+}
+
+// ─── 26. IStatusCondition (§2.2.2.1.9) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.1.9
+ * @metaclass concrete
+ * @generalization ICondition
+ * @definition A StatusCondition object is a specific Condition that is
+ *   associated with each Entity. The trigger_value of the StatusCondition
+ *   depends on the communication status of that entity (e.g., arrival of
+ *   data, loss of information, etc.), `filtered' by the set of
+ *   enabled_statuses on the StatusCondition.
+ * @ownedAttributes
+ *   enabled_statuses : StatusKind [*]
+ * @associationEnds
+ *   entity : Entity [1] (accessed via get_entity)
+ * @operations
+ *   get_enabled_statuses() : StatusKind[*]
+ *   set_enabled_statuses(mask : StatusKind[*]) : ReturnCode_t
+ *   get_entity() : Entity
+ * @constraints
+ *   [default_enabled_statuses]: If set_enabled_statuses is not invoked, the
+ *     default list of enabled statuses includes all the statuses.
+ *     (DDS 1.4 §2.2.2.1.9.1)
+ *   [single_entity]: There is exactly one Entity associated with each
+ *     StatusCondition. (DDS 1.4 §2.2.2.1.9.3)
+ */
+export interface IStatusCondition extends ICondition {
+  readonly enabledStatuses: ReadonlyArray<StatusKind>;
+  readonly entityId: string;
+  // -- Operations --
+  getEnabledStatuses(): ReadonlyArray<StatusKind>;
+  setEnabledStatuses(mask: ReadonlyArray<StatusKind>): ReturnCode_t;
+  getEntity(): string;
+}
+
+export class StatusCondition implements IStatusCondition {
+  readonly metaClass = "StatusCondition" as const;
+  readonly enabledStatuses: ReadonlyArray<StatusKind>;
+  readonly entityId: string;
+  constructor(data: { enabledStatuses: ReadonlyArray<StatusKind>; entityId: string }) {
+    this.enabledStatuses = data.enabledStatuses;
+    this.entityId = data.entityId;
+  }
+  getTriggerValue(): boolean { return false; }
+  getEnabledStatuses(): ReadonlyArray<StatusKind> { return this.enabledStatuses; }
+  setEnabledStatuses(_mask: ReadonlyArray<StatusKind>): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  getEntity(): string { return this.entityId; }
+}
+
+// ─── 27. IReadCondition (§2.2.2.5.8) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.5.8
+ * @metaclass concrete
+ * @generalization ICondition
+ * @definition ReadCondition objects are conditions specifically dedicated to
+ *   read operations and attached to one DataReader. ReadCondition objects
+ *   allow an application to specify the data samples it is interested in (by
+ *   specifying the desired sample-states, view-states, and instance-states).
+ *   See the parameter definitions for DataReader's read/take operations.
+ *   This allows the middleware to enable the condition only when suitable
+ *   information is available. They are to be used in conjunction with a
+ *   WaitSet as normal conditions. More than one ReadCondition may be
+ *   attached to the same DataReader.
+ * @ownedAttributes
+ *   (the masks captured at creation time are immutable; cf. §2.2.2.5.8.2 ..
+ *    §2.2.2.5.8.4)
+ * @associationEnds
+ *   datareader : DataReader [1] (accessed via get_datareader)
+ * @operations
+ *   get_datareader() : DataReader
+ *   get_sample_state_mask() : SampleStateKind[*]
+ *   get_view_state_mask() : ViewStateKind[*]
+ *   get_instance_state_mask() : InstanceStateKind[*]
+ * @constraints
+ *   [single_datareader]: There is exactly one DataReader associated with
+ *     each ReadCondition. (DDS 1.4 §2.2.2.5.8.1)
+ *   [masks_immutable]: get_sample_state_mask, get_view_state_mask,
+ *     get_instance_state_mask return the states specified when the
+ *     ReadCondition was created. (DDS 1.4 §2.2.2.5.8.2 .. §2.2.2.5.8.4)
+ */
+export interface IReadCondition extends ICondition {
+  readonly sampleStateMask: SampleStateMask;
+  readonly viewStateMask: ViewStateMask;
+  readonly instanceStateMask: InstanceStateMask;
+  readonly datareaderId: string;
+  // -- Operations --
+  getDatareader(): string;
+  getSampleStateMask(): SampleStateMask;
+  getViewStateMask(): ViewStateMask;
+  getInstanceStateMask(): InstanceStateMask;
+}
+
+export class ReadCondition implements IReadCondition {
+  readonly metaClass = "ReadCondition" as const;
+  readonly sampleStateMask: SampleStateMask;
+  readonly viewStateMask: ViewStateMask;
+  readonly instanceStateMask: InstanceStateMask;
+  readonly datareaderId: string;
+  constructor(data: {
+    sampleStateMask: SampleStateMask;
+    viewStateMask: ViewStateMask;
+    instanceStateMask: InstanceStateMask;
+    datareaderId: string;
+  }) {
+    this.sampleStateMask = data.sampleStateMask;
+    this.viewStateMask = data.viewStateMask;
+    this.instanceStateMask = data.instanceStateMask;
+    this.datareaderId = data.datareaderId;
+  }
+  getTriggerValue(): boolean { return false; }
+  getDatareader(): string { return this.datareaderId; }
+  getSampleStateMask(): SampleStateMask { return this.sampleStateMask; }
+  getViewStateMask(): ViewStateMask { return this.viewStateMask; }
+  getInstanceStateMask(): InstanceStateMask { return this.instanceStateMask; }
+}
+
+// ─── 28. IQueryCondition (§2.2.2.5.9) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.5.9
+ * @metaclass concrete (optional profile)
+ * @generalization IReadCondition
+ * @definition QueryCondition objects are specialized ReadCondition objects
+ *   that allow the application to also specify a filter on the locally
+ *   available data. The query (query_expression) is similar to an SQL WHERE
+ *   clause and can be parameterized by arguments that are dynamically
+ *   changeable by the set_query_parameters operation. Precise syntax for
+ *   the query expression can be found in Annex B.
+ * @ownedAttributes
+ *   query_expression : String [1]
+ *   query_parameters : String [*]
+ * @associationEnds
+ *   (inherits ReadCondition::datareader)
+ * @operations
+ *   get_query_expression() : String
+ *   get_query_parameters(out query_parameters : String[*]) : ReturnCode_t
+ *   set_query_parameters(query_parameters : String[*]) : ReturnCode_t
+ * @constraints
+ *   [optional_profile]: This feature is optional. In the cases where it is
+ *     not supported, the DataReader::create_querycondition will return a
+ *     `nil' value (as specified by the platform). (DDS 1.4 §2.2.2.5.9)
+ *   [expression_immutable]: get_query_expression returns the expression
+ *     specified when the QueryCondition was created. (DDS 1.4 §2.2.2.5.9.1)
+ *   [parameters_initialized]: get_query_parameters returns the parameters
+ *     specified on the last successful call to set_query_parameters, or if
+ *     set_query_parameters was never called, the arguments specified when
+ *     the QueryCondition was created. (DDS 1.4 §2.2.2.5.9.2)
+ */
+export interface IQueryCondition extends IReadCondition {
+  readonly queryExpression: string;
+  readonly queryParameters: ReadonlyArray<string>;
+  // -- Operations --
+  getQueryExpression(): string;
+  getQueryParameters(): ReadonlyArray<string>;
+  setQueryParameters(queryParameters: ReadonlyArray<string>): ReturnCode_t;
+}
+
+export class QueryCondition implements IQueryCondition {
+  readonly metaClass = "QueryCondition" as const;
+  readonly sampleStateMask: SampleStateMask;
+  readonly viewStateMask: ViewStateMask;
+  readonly instanceStateMask: InstanceStateMask;
+  readonly datareaderId: string;
+  readonly queryExpression: string;
+  readonly queryParameters: ReadonlyArray<string>;
+  constructor(data: {
+    sampleStateMask: SampleStateMask;
+    viewStateMask: ViewStateMask;
+    instanceStateMask: InstanceStateMask;
+    datareaderId: string;
+    queryExpression: string;
+    queryParameters: ReadonlyArray<string>;
+  }) {
+    this.sampleStateMask = data.sampleStateMask;
+    this.viewStateMask = data.viewStateMask;
+    this.instanceStateMask = data.instanceStateMask;
+    this.datareaderId = data.datareaderId;
+    this.queryExpression = data.queryExpression;
+    this.queryParameters = data.queryParameters;
+  }
+  // -- ICondition --
+  getTriggerValue(): boolean { return false; }
+  // -- IReadCondition --
+  getDatareader(): string { return this.datareaderId; }
+  getSampleStateMask(): SampleStateMask { return this.sampleStateMask; }
+  getViewStateMask(): ViewStateMask { return this.viewStateMask; }
+  getInstanceStateMask(): InstanceStateMask { return this.instanceStateMask; }
+  // -- IQueryCondition --
+  getQueryExpression(): string { return this.queryExpression; }
+  getQueryParameters(): ReadonlyArray<string> { return this.queryParameters; }
+  setQueryParameters(_queryParameters: ReadonlyArray<string>): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+}
+
+// ─── 29. IWaitSet (§2.2.2.1.6) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.1.6
+ * @metaclass concrete (not an Entity)
+ * @generalization (root)
+ * @definition A WaitSet object allows an application to wait until one or
+ *   more of the attached Condition objects has a trigger_value of TRUE or
+ *   else until the timeout expires. WaitSet has no factory. It is created
+ *   as an object directly by the natural means in each language binding
+ *   (e.g., using "new" in C++ or Java). This is because it is not
+ *   necessarily associated with a single DomainParticipant and could be
+ *   used to wait on Condition objects associated with different
+ *   DomainParticipant objects.
+ * @ownedAttributes
+ *   (none declared in §2.2.2.1.6)
+ * @associationEnds
+ *   conditions : Condition [*] (attached via attach_condition / detach_condition)
+ * @operations
+ *   attach_condition(a_condition : Condition) : ReturnCode_t
+ *   detach_condition(a_condition : Condition) : ReturnCode_t
+ *   wait(out active_conditions : Condition[*], timeout : Duration_t) : ReturnCode_t
+ *   get_conditions(out attached_conditions : Condition[*]) : ReturnCode_t
+ * @constraints
+ *   [attach_redundant]: Adding a Condition that is already attached to the
+ *     WaitSet has no effect. (DDS 1.4 §2.2.2.1.6.1)
+ *   [attach_error_codes]: Possible error codes returned in addition to the
+ *     standard ones: OUT_OF_RESOURCES. (DDS 1.4 §2.2.2.1.6.1)
+ *   [detach_precondition]: If the Condition was not attached to the WaitSet,
+ *     the operation will return PRECONDITION_NOT_MET. (DDS 1.4 §2.2.2.1.6.2)
+ *   [detach_error_codes]: Possible error codes returned in addition to the
+ *     standard ones: PRECONDITION_NOT_MET. (DDS 1.4 §2.2.2.1.6.2)
+ *   [wait_timeout]: It this duration is exceeded and none of the attached
+ *     Condition objects is true, wait will return with the return code
+ *     TIMEOUT. (DDS 1.4 §2.2.2.1.6.3)
+ *   [single_waiter]: It is not allowed for more than one application thread
+ *     to be waiting on the same WaitSet. If the wait operation is invoked
+ *     on a WaitSet that already has a thread blocking on it, the operation
+ *     will return immediately with the value PRECONDITION_NOT_MET.
+ *     (DDS 1.4 §2.2.2.1.6.3)
+ */
+export interface IWaitSet {
+  // -- Operations --
+  attachCondition(aConditionId: string): ReturnCode_t;
+  detachCondition(aConditionId: string): ReturnCode_t;
+  wait(timeout: IDuration_t): { code: ReturnCode_t; activeConditionIds: ReadonlyArray<string> };
+  getConditions(): ReadonlyArray<string>;
+}
+
+export class WaitSet implements IWaitSet {
+  readonly metaClass = "WaitSet" as const;
+  attachCondition(_aConditionId: string): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  detachCondition(_aConditionId: string): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  wait(_timeout: IDuration_t): { code: ReturnCode_t; activeConditionIds: ReadonlyArray<string> } {
+    return { code: RETURN_CODE.RETCODE_OK, activeConditionIds: [] };
+  }
+  getConditions(): ReadonlyArray<string> { return []; }
+}
+
+// ─── 30. ISampleInfo (§2.2.2.5.5) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.5.5
+ * @metaclass concrete (struct, no operations)
+ * @generalization (root)
+ * @definition SampleInfo is the information that accompanies each sample
+ *   that is `read' or `taken.' It contains the following information: the
+ *   sample_state (READ or NOT_READ); the view_state (NEW or NOT_NEW); the
+ *   instance_state (ALIVE, NOT_ALIVE_DISPOSED, or NOT_ALIVE_NO_WRITERS);
+ *   the disposed_generation_count and no_writers_generation_count; the
+ *   sample_rank, generation_rank, and absolute_generation_rank; the
+ *   source_timestamp; the instance_handle; the publication_handle; and
+ *   the valid_data flag.
+ * @ownedAttributes
+ *   sample_state : SampleStateKind [1]
+ *   view_state : ViewStateKind [1]
+ *   instance_state : InstanceStateKind [1]
+ *   disposed_generation_count : long [1]
+ *   no_writers_generation_count : long [1]
+ *   sample_rank : long [1]
+ *   generation_rank : long [1]
+ *   absolute_generation_rank : long [1]
+ *   source_timestamp : Time_t [1]
+ *   instance_handle : InstanceHandle_t [1]
+ *   publication_handle : InstanceHandle_t [1]
+ *   valid_data : Boolean [1]
+ * @associationEnds
+ *   (none declared in §2.2.2.5.5)
+ * @operations
+ *   No operations
+ * @constraints
+ *   (none declared in DDS 1.4 §2.2.2.5.5; per-field interpretation rules in
+ *    §2.2.2.5.1.1 .. §2.2.2.5.1.8)
+ */
+export interface ISampleInfo {
+  readonly sampleState: SampleStateKind;
+  readonly viewState: ViewStateKind;
+  readonly instanceState: InstanceStateKind;
+  readonly disposedGenerationCount: number;
+  readonly noWritersGenerationCount: number;
+  readonly sampleRank: number;
+  readonly generationRank: number;
+  readonly absoluteGenerationRank: number;
+  readonly sourceTimestamp: ITime_t;
+  readonly instanceHandle: IInstanceHandle_t;
+  readonly publicationHandle: IInstanceHandle_t;
+  readonly validData: boolean;
+  /**
+   * Reception timestamp — implementer #2 partition note: the IDL `struct
+   * SampleInfo` (§2.3.3 / dds_dcps.idl) does NOT declare a
+   * reception_timestamp field. The PIM section §2.2.2.5.5 likewise omits
+   * it. The partition brief listed reception_timestamp as a SampleInfo
+   * attribute; this surface treats it as optional metadata that
+   * conforming PSMs MAY surface but the normative DDS 1.4 PIM does not
+   * require. Flagged as a partition ambiguity. @section §?
+   */
+  readonly receptionTimestamp?: ITime_t;
+}
+
+export class SampleInfo implements ISampleInfo {
+  readonly metaClass = "SampleInfo" as const;
+  readonly sampleState: SampleStateKind;
+  readonly viewState: ViewStateKind;
+  readonly instanceState: InstanceStateKind;
+  readonly disposedGenerationCount: number;
+  readonly noWritersGenerationCount: number;
+  readonly sampleRank: number;
+  readonly generationRank: number;
+  readonly absoluteGenerationRank: number;
+  readonly sourceTimestamp: ITime_t;
+  readonly instanceHandle: IInstanceHandle_t;
+  readonly publicationHandle: IInstanceHandle_t;
+  readonly validData: boolean;
+  readonly receptionTimestamp?: ITime_t;
+  constructor(data: {
+    sampleState: SampleStateKind;
+    viewState: ViewStateKind;
+    instanceState: InstanceStateKind;
+    disposedGenerationCount: number;
+    noWritersGenerationCount: number;
+    sampleRank: number;
+    generationRank: number;
+    absoluteGenerationRank: number;
+    sourceTimestamp: ITime_t;
+    instanceHandle: IInstanceHandle_t;
+    publicationHandle: IInstanceHandle_t;
+    validData: boolean;
+    receptionTimestamp?: ITime_t;
+  }) {
+    this.sampleState = data.sampleState;
+    this.viewState = data.viewState;
+    this.instanceState = data.instanceState;
+    this.disposedGenerationCount = data.disposedGenerationCount;
+    this.noWritersGenerationCount = data.noWritersGenerationCount;
+    this.sampleRank = data.sampleRank;
+    this.generationRank = data.generationRank;
+    this.absoluteGenerationRank = data.absoluteGenerationRank;
+    this.sourceTimestamp = data.sourceTimestamp;
+    this.instanceHandle = data.instanceHandle;
+    this.publicationHandle = data.publicationHandle;
+    this.validData = data.validData;
+    this.receptionTimestamp = data.receptionTimestamp;
+  }
+}
+
+// ─── 31. IDataWriter (§2.2.2.4.2) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.4.2
+ * @metaclass concrete (PIM marks the class abstract; surfaced concrete
+ *   because the IDL projection forms a non-templated `interface DataWriter
+ *   : Entity` base. The typed write/register_instance/lookup_instance/
+ *   dispose operations are part of the auto-generated FooDataWriter
+ *   specialization (per §2.2.2.4.2 introductory text and the
+ *   FooDataWriter table) and are NOT surfaced on the base class.)
+ * @generalization IEntity
+ * @definition DataWriter allows the application to set the value of the data
+ *   to be published under a given Topic. A DataWriter is attached to
+ *   exactly one Publisher that acts as a factory for it. A DataWriter is
+ *   bound to exactly one Topic and therefore to exactly one data type. The
+ *   Topic must exist prior to the DataWriter's creation.
+ * @ownedAttributes
+ *   (none declared in §2.2.2.4.2)
+ * @associationEnds
+ *   topic : Topic [1] (accessed via get_topic)
+ *   publisher : Publisher [1] (accessed via get_publisher)
+ * @operations
+ *   set_qos(qos : DataWriterQos) : ReturnCode_t                 (overrides Entity)
+ *   get_qos(out qos : DataWriterQos) : ReturnCode_t             (overrides Entity)
+ *   set_listener(a_listener : DataWriterListener,
+ *                mask : StatusKind[*]) : ReturnCode_t
+ *   get_listener() : DataWriterListener
+ *   get_topic() : Topic
+ *   get_publisher() : Publisher
+ *   wait_for_acknowledgments(max_wait : Duration_t) : ReturnCode_t
+ *   get_liveliness_lost_status(out status : LivelinessLostStatus) : ReturnCode_t
+ *   get_offered_deadline_missed_status(out status : OfferedDeadlineMissedStatus) : ReturnCode_t
+ *   get_offered_incompatible_qos_status(out status : OfferedIncompatibleQosStatus) : ReturnCode_t
+ *   get_publication_matched_status(out status : PublicationMatchedStatus) : ReturnCode_t
+ *   assert_liveliness() : ReturnCode_t
+ *   get_matched_subscriptions(out subscription_handles : InstanceHandle_t[*]) : ReturnCode_t
+ *   get_matched_subscription_data(
+ *       out subscription_data : SubscriptionBuiltinTopicData,
+ *       subscription_handle : InstanceHandle_t) : ReturnCode_t
+ *   -- Type-parametric operations on the FooDataWriter specialization (see
+ *      §2.2.2.4.2 introduction and FooDataWriter table; commented out in
+ *      `dds_dcps.idl` lines 913-944): register_instance,
+ *      register_instance_w_timestamp, unregister_instance,
+ *      unregister_instance_w_timestamp, write, write_w_timestamp, dispose,
+ *      dispose_w_timestamp, get_key_value, lookup_instance.
+ * @constraints
+ *   [not_enabled_return]: All operations except for the base-class operations
+ *     set_qos, get_qos, set_listener, get_listener, enable, and
+ *     get_statuscondition may return the value NOT_ENABLED.
+ *     (DDS 1.4 §2.2.2.4.2)
+ *   [single_topic]: A DataWriter is bound to exactly one Topic and therefore
+ *     to exactly one data type. The Topic must exist prior to the
+ *     DataWriter's creation. (DDS 1.4 §2.2.2.4.2)
+ *   [single_publisher]: A DataWriter is attached to exactly one Publisher
+ *     that acts as a factory for it. (DDS 1.4 §2.2.2.4.2)
+ *   [set_qos_error_codes]: Possible error codes returned in addition to the
+ *     standard ones: IMMUTABLE_POLICY, INCONSISTENT_POLICY.
+ *     (DDS 1.4 §2.2.2.4.2.3)
+ */
+export interface IDataWriter extends IEntity {
+  // -- Operations --
+  getTopic(): string;
+  getPublisher(): string;
+  waitForAcknowledgments(maxWait: IDuration_t): ReturnCode_t;
+  getLivelinessLostStatus(): string | undefined;
+  getOfferedDeadlineMissedStatus(): string | undefined;
+  getOfferedIncompatibleQosStatus(): string | undefined;
+  getPublicationMatchedStatus(): string | undefined;
+  assertLiveliness(): ReturnCode_t;
+  getMatchedSubscriptions(): ReadonlyArray<IInstanceHandle_t>;
+  getMatchedSubscriptionData(subscriptionHandle: IInstanceHandle_t): string | undefined;
+}
+
+export class DataWriter implements IDataWriter {
+  readonly metaClass = "DataWriter" as const;
+  readonly topicId: string;
+  readonly publisherId: string;
+  constructor(data: { topicId: string; publisherId: string }) {
+    this.topicId = data.topicId;
+    this.publisherId = data.publisherId;
+  }
+  // -- IEntity --
+  setQos(_qosList: ReadonlyArray<string>): string { return RETURN_CODE.RETCODE_OK; }
+  getQos(): ReadonlyArray<string> { return []; }
+  setListener(_aListener: string | undefined, _mask: ReadonlyArray<StatusKind>): string { return RETURN_CODE.RETCODE_OK; }
+  getListener(): string | undefined { return undefined; }
+  enable(): string { return RETURN_CODE.RETCODE_OK; }
+  getStatuscondition(): string | undefined { return undefined; }
+  getStatusChanges(): ReadonlyArray<StatusKind> { return []; }
+  getInstanceHandle(): string | undefined { return undefined; }
+  // -- IDataWriter --
+  getTopic(): string { return this.topicId; }
+  getPublisher(): string { return this.publisherId; }
+  waitForAcknowledgments(_maxWait: IDuration_t): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  getLivelinessLostStatus(): string | undefined { return undefined; }
+  getOfferedDeadlineMissedStatus(): string | undefined { return undefined; }
+  getOfferedIncompatibleQosStatus(): string | undefined { return undefined; }
+  getPublicationMatchedStatus(): string | undefined { return undefined; }
+  assertLiveliness(): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  getMatchedSubscriptions(): ReadonlyArray<IInstanceHandle_t> { return []; }
+  getMatchedSubscriptionData(_subscriptionHandle: IInstanceHandle_t): string | undefined { return undefined; }
+}
+
+// ─── 32. IDataReader (§2.2.2.5.3) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §2.2.2.5.3
+ * @metaclass concrete (PIM marks the class abstract; surfaced concrete
+ *   because the IDL projection forms a non-templated `interface DataReader
+ *   : Entity` base. The typed read / take / read_w_condition /
+ *   take_w_condition / read_next_sample / take_next_sample /
+ *   *_instance variants are part of the auto-generated FooDataReader
+ *   specialization (per §2.2.2.5.3 introductory text and the
+ *   FooDataReader table) and are NOT surfaced on the base class.)
+ * @generalization IEntity
+ * @definition A DataReader allows the application (1) to declare the data it
+ *   wishes to receive (i.e., make a subscription) and (2) to access the
+ *   data received by the attached Subscriber. A DataReader refers to
+ *   exactly one TopicDescription (either a Topic, a ContentFilteredTopic,
+ *   or a MultiTopic) that identifies the data to be read. The subscription
+ *   has a unique resulting type. The data-reader may give access to several
+ *   instances of the resulting type, which can be distinguished from each
+ *   other by their key.
+ * @ownedAttributes
+ *   (none declared in §2.2.2.5.3)
+ * @associationEnds
+ *   topicdescription : TopicDescription [1] (accessed via get_topicdescription)
+ *   subscriber : Subscriber [1] (accessed via get_subscriber)
+ * @operations
+ *   set_qos(qos : DataReaderQos) : ReturnCode_t                 (overrides Entity)
+ *   get_qos(out qos : DataReaderQos) : ReturnCode_t             (overrides Entity)
+ *   set_listener(a_listener : DataReaderListener,
+ *                mask : StatusKind[*]) : ReturnCode_t
+ *   get_listener() : DataReaderListener
+ *   create_readcondition(sample_states : SampleStateMask,
+ *                        view_states : ViewStateMask,
+ *                        instance_states : InstanceStateMask) : ReadCondition
+ *   create_querycondition(sample_states : SampleStateMask,
+ *                         view_states : ViewStateMask,
+ *                         instance_states : InstanceStateMask,
+ *                         query_expression : String,
+ *                         query_parameters : String[*]) : QueryCondition
+ *   delete_readcondition(a_condition : ReadCondition) : ReturnCode_t
+ *   delete_contained_entities() : ReturnCode_t
+ *   get_topicdescription() : TopicDescription
+ *   get_subscriber() : Subscriber
+ *   get_sample_rejected_status(out status : SampleRejectedStatus) : ReturnCode_t
+ *   get_liveliness_changed_status(out status : LivelinessChangedStatus) : ReturnCode_t
+ *   get_requested_deadline_missed_status(out status : RequestedDeadlineMissedStatus) : ReturnCode_t
+ *   get_requested_incompatible_qos_status(out status : RequestedIncompatibleQosStatus) : ReturnCode_t
+ *   get_subscription_matched_status(out status : SubscriptionMatchedStatus) : ReturnCode_t
+ *   get_sample_lost_status(out status : SampleLostStatus) : ReturnCode_t
+ *   wait_for_historical_data(max_wait : Duration_t) : ReturnCode_t
+ *   get_matched_publications(out publication_handles : InstanceHandle_t[*]) : ReturnCode_t
+ *   get_matched_publication_data(
+ *       out publication_data : PublicationBuiltinTopicData,
+ *       publication_handle : InstanceHandle_t) : ReturnCode_t
+ *   -- Read/take operations on the FooDataReader specialization (see
+ *      §2.2.2.5.3 introduction and FooDataReader table; commented out in
+ *      `dds_dcps.idl` lines 1025-1121): read, take, read_w_condition,
+ *      take_w_condition, read_next_sample, take_next_sample,
+ *      read_instance, take_instance, read_next_instance,
+ *      take_next_instance, read_next_instance_w_condition,
+ *      take_next_instance_w_condition, return_loan, get_key_value,
+ *      lookup_instance.
+ * @constraints
+ *   [single_topicdescription]: A DataReader refers to exactly one
+ *     TopicDescription. (DDS 1.4 §2.2.2.5.3)
+ *   [previous_handle_handle_nil]: The special value HANDLE_NIL is guaranteed
+ *     to be `less than' any valid instance_handle. So the use of the
+ *     parameter value previous_handle==HANDLE_NIL will return the samples
+ *     for the instance which has the smallest instance_handle among all
+ *     the ones that qualify the other criteria. (DDS 1.4 §2.2.2.5.3.16)
+ *   [bad_parameter_handle]: This operation may return BAD_PARAMETER if the
+ *     InstanceHandle_t a_handle does not correspond to an existing data-
+ *     object known to the DataReader. (DDS 1.4 §2.2.2.5.3.14 .. .15 / .29)
+ */
+export interface IDataReader extends IEntity {
+  // -- Operations --
+  createReadcondition(
+    sampleStates: SampleStateMask,
+    viewStates: ViewStateMask,
+    instanceStates: InstanceStateMask,
+  ): string | undefined;
+  createQuerycondition(
+    sampleStates: SampleStateMask,
+    viewStates: ViewStateMask,
+    instanceStates: InstanceStateMask,
+    queryExpression: string,
+    queryParameters: ReadonlyArray<string>,
+  ): string | undefined;
+  deleteReadcondition(aConditionId: string): ReturnCode_t;
+  deleteContainedEntities(): ReturnCode_t;
+  getTopicdescription(): string;
+  getSubscriber(): string;
+  getSampleRejectedStatus(): string | undefined;
+  getLivelinessChangedStatus(): string | undefined;
+  getRequestedDeadlineMissedStatus(): string | undefined;
+  getRequestedIncompatibleQosStatus(): string | undefined;
+  getSubscriptionMatchedStatus(): string | undefined;
+  getSampleLostStatus(): string | undefined;
+  waitForHistoricalData(maxWait: IDuration_t): ReturnCode_t;
+  getMatchedPublications(): ReadonlyArray<IInstanceHandle_t>;
+  getMatchedPublicationData(publicationHandle: IInstanceHandle_t): string | undefined;
+}
+
+export class DataReader implements IDataReader {
+  readonly metaClass = "DataReader" as const;
+  readonly topicdescriptionId: string;
+  readonly subscriberId: string;
+  constructor(data: { topicdescriptionId: string; subscriberId: string }) {
+    this.topicdescriptionId = data.topicdescriptionId;
+    this.subscriberId = data.subscriberId;
+  }
+  // -- IEntity --
+  setQos(_qosList: ReadonlyArray<string>): string { return RETURN_CODE.RETCODE_OK; }
+  getQos(): ReadonlyArray<string> { return []; }
+  setListener(_aListener: string | undefined, _mask: ReadonlyArray<StatusKind>): string { return RETURN_CODE.RETCODE_OK; }
+  getListener(): string | undefined { return undefined; }
+  enable(): string { return RETURN_CODE.RETCODE_OK; }
+  getStatuscondition(): string | undefined { return undefined; }
+  getStatusChanges(): ReadonlyArray<StatusKind> { return []; }
+  getInstanceHandle(): string | undefined { return undefined; }
+  // -- IDataReader --
+  createReadcondition(
+    _sampleStates: SampleStateMask,
+    _viewStates: ViewStateMask,
+    _instanceStates: InstanceStateMask,
+  ): string | undefined { return undefined; }
+  createQuerycondition(
+    _sampleStates: SampleStateMask,
+    _viewStates: ViewStateMask,
+    _instanceStates: InstanceStateMask,
+    _queryExpression: string,
+    _queryParameters: ReadonlyArray<string>,
+  ): string | undefined { return undefined; }
+  deleteReadcondition(_aConditionId: string): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  deleteContainedEntities(): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  getTopicdescription(): string { return this.topicdescriptionId; }
+  getSubscriber(): string { return this.subscriberId; }
+  getSampleRejectedStatus(): string | undefined { return undefined; }
+  getLivelinessChangedStatus(): string | undefined { return undefined; }
+  getRequestedDeadlineMissedStatus(): string | undefined { return undefined; }
+  getRequestedIncompatibleQosStatus(): string | undefined { return undefined; }
+  getSubscriptionMatchedStatus(): string | undefined { return undefined; }
+  getSampleLostStatus(): string | undefined { return undefined; }
+  waitForHistoricalData(_maxWait: IDuration_t): ReturnCode_t { return RETURN_CODE.RETCODE_OK; }
+  getMatchedPublications(): ReadonlyArray<IInstanceHandle_t> { return []; }
+  getMatchedPublicationData(_publicationHandle: IInstanceHandle_t): string | undefined { return undefined; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// — END Implementer #2: DCPS Communication —
+//
+// Deferred to implementer #4 (Listeners + Status structures, §2.2.4):
+//   • Status payload structs (§2.2.4.1 .. §2.2.4.x):
+//       InconsistentTopicStatus, SampleLostStatus, SampleRejectedStatus
+//       (with SampleRejectedStatusKind), LivelinessLostStatus,
+//       LivelinessChangedStatus, OfferedDeadlineMissedStatus,
+//       RequestedDeadlineMissedStatus, OfferedIncompatibleQosStatus,
+//       RequestedIncompatibleQosStatus, PublicationMatchedStatus,
+//       SubscriptionMatchedStatus, QosPolicyCount.
+//   • Listener interfaces (§2.2.2.1.4 + §2.2.2.4.4 + §2.2.2.5.6 +
+//     §2.2.2.5.7 + §2.2.2.3.5 + §2.2.2.2.3): Listener, TopicListener,
+//     DataWriterListener, PublisherListener, DataReaderListener,
+//     SubscriberListener, DomainParticipantListener.
+//   • Built-in topic data structs (§2.3.5):
+//       ParticipantBuiltinTopicData, TopicBuiltinTopicData,
+//       PublicationBuiltinTopicData, SubscriptionBuiltinTopicData.
+//
+// Spec ambiguity flagged in this partition:
+//   • SampleInfo::receptionTimestamp — listed in the partition brief but
+//     NOT declared in §2.2.2.5.5 nor in dds_dcps.idl `struct SampleInfo`.
+//     Surfaced as an optional field with an explanatory JSDoc note.
+//     @section §?
+// ═══════════════════════════════════════════════════════════════════════════
