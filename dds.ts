@@ -5270,3 +5270,1467 @@ export class SubscriptionBuiltinTopicData
 //   • Final index.ts namespace barrel — populate `dds.{concept}.{verb}`
 //     export surface after all five implementer sections compile.
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Implementer #5 — DLRL (Data Local Reconstruction Layer)
+//
+// Source: spec/dds_dlrl.idl (the authoritative DLRL IDL artifact in this
+// repo). The DDS 1.4 specification (formal/2015-04-10) describes only the
+// PIM and the IDL PSM in §2 — the original DLRL chapter (present in DDS 1.0
+// through 1.2) was removed before 1.4 and is therefore not anchored to a
+// numbered §2.3.x section in the 1.4 PDF. Section tags use `@section §?`
+// throughout to flag this scope ambiguity, while the metaclass surface
+// itself faithfully mirrors `dds_dlrl.idl` (which corresponds to the OMG
+// DLRL formal sub-specification).
+//
+// Contents:
+//   • DLRL kind enums (CacheUsage, ObjectState, DCPSState, CacheKind,
+//     RelationKind, ObjectScope, ReferenceScope, CriterionKind,
+//     MembershipState)
+//   • DLRL value-type carriers (DLRLOid, DLRLOidGenerator, RelationDescription
+//     and its three children, CacheDescription)
+//   • DLRL listeners (ObjectListener, SelectionListener, CacheListener — all
+//     with default NO-OP implementations)
+//   • DLRL Selection criteria (SelectionCriterion, FilterCriterion,
+//     QueryCriterion)
+//   • DLRL Contract (cloning-control struct on a CacheAccess)
+//   • DLRL ObjectRoot (root for every shared DLRL object)
+//   • DLRL Selection (dynamic subset of an ObjectHome)
+//   • DLRL ObjectHome (representative of an applicative class)
+//   • DLRL Collection / List / Set / StrMap / IntMap (relation collection
+//     value-types)
+//   • DLRL CacheBase / CacheAccess / Cache (the cache hierarchy)
+//   • DLRL CacheFactory (Cache instance factory)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── 100. ReferenceScope (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition ReferenceScope governs how far an operation reaches when
+ *   following a single DLRL reference relation. Per `dds_dlrl.idl`:
+ *   `enum ReferenceScope { SIMPLE_CONTENT_SCOPE, REFERENCED_CONTENTS_SCOPE };`
+ *   SIMPLE_CONTENT_SCOPE limits the operation to the reference content
+ *   itself; REFERENCED_CONTENTS_SCOPE additionally cascades to the contents
+ *   reachable through that reference.
+ * @ownedAttributes
+ *   (kind enum — no owned attributes)
+ * @associationEnds
+ *   (none)
+ * @operations
+ *   (none)
+ * @constraints
+ *   (none declared in dds_dlrl.idl)
+ */
+export const REFERENCE_SCOPE = {
+  SIMPLE_CONTENT_SCOPE: "SIMPLE_CONTENT_SCOPE",
+  REFERENCED_CONTENTS_SCOPE: "REFERENCED_CONTENTS_SCOPE",
+} as const;
+export type ReferenceScope =
+  typeof REFERENCE_SCOPE[keyof typeof REFERENCE_SCOPE];
+
+// ─── 101. ObjectScope (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition ObjectScope governs how far an operation propagates through
+ *   the DLRL object graph. Per `dds_dlrl.idl`:
+ *   `enum ObjectScope { SIMPLE_OBJECT_SCOPE, CONTAINED_OBJECTS_SCOPE,
+ *    RELATED_OBJECTS_SCOPE };`. SIMPLE_OBJECT_SCOPE acts on the object
+ *   itself; CONTAINED_OBJECTS_SCOPE additionally cascades to objects
+ *   reachable through composition relations; RELATED_OBJECTS_SCOPE
+ *   cascades through every related object regardless of relation kind.
+ * @ownedAttributes (kind enum — no owned attributes)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const OBJECT_SCOPE = {
+  SIMPLE_OBJECT_SCOPE: "SIMPLE_OBJECT_SCOPE",
+  CONTAINED_OBJECTS_SCOPE: "CONTAINED_OBJECTS_SCOPE",
+  RELATED_OBJECTS_SCOPE: "RELATED_OBJECTS_SCOPE",
+} as const;
+export type ObjectScope = typeof OBJECT_SCOPE[keyof typeof OBJECT_SCOPE];
+
+// ─── 102. DCPSState (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition DCPSState describes the lifecycle phase of a DLRL Cache with
+ *   respect to its underlying DCPS infrastructure. Per `dds_dlrl.idl`:
+ *   `enum DCPSState { INITIAL, REGISTERED, ENABLED };`. INITIAL — the
+ *   Cache exists but no DCPS Topic/DataReader/DataWriter has been
+ *   registered yet; REGISTERED — DCPS infrastructure has been registered
+ *   for every ObjectHome managed by the Cache; ENABLED — the Cache and
+ *   its DCPS infrastructure are operational and exchanging data.
+ * @ownedAttributes (kind enum)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const DCPS_STATE = {
+  INITIAL: "INITIAL",
+  REGISTERED: "REGISTERED",
+  ENABLED: "ENABLED",
+} as const;
+export type DCPSState = typeof DCPS_STATE[keyof typeof DCPS_STATE];
+
+// ─── 103. CacheUsage (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition CacheUsage declares the access purpose of a Cache or
+ *   CacheAccess. Per `dds_dlrl.idl`:
+ *   `enum CacheUsage { READ_ONLY, WRITE_ONLY, READ_WRITE };`.
+ *   READ_ONLY — the cache observes data only; WRITE_ONLY — the cache
+ *   produces data only; READ_WRITE — the cache participates in both
+ *   directions.
+ * @ownedAttributes (kind enum)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const CACHE_USAGE = {
+  READ_ONLY: "READ_ONLY",
+  WRITE_ONLY: "WRITE_ONLY",
+  READ_WRITE: "READ_WRITE",
+} as const;
+export type CacheUsage = typeof CACHE_USAGE[keyof typeof CACHE_USAGE];
+
+// ─── 104. ObjectState (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition ObjectState classifies, for any DLRL object, the lifecycle
+ *   state observed by the application. Per `dds_dlrl.idl`:
+ *   `enum ObjectState { OBJECT_VOID, OBJECT_NEW, OBJECT_NOT_MODIFIED,
+ *    OBJECT_MODIFIED, OBJECT_DELETED };`. The same enum is used to surface
+ *   both the read state (what arrived from DCPS) and the write state (what
+ *   the application has produced locally) of each ObjectRoot instance.
+ * @ownedAttributes (kind enum)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const OBJECT_STATE = {
+  OBJECT_VOID: "OBJECT_VOID",
+  OBJECT_NEW: "OBJECT_NEW",
+  OBJECT_NOT_MODIFIED: "OBJECT_NOT_MODIFIED",
+  OBJECT_MODIFIED: "OBJECT_MODIFIED",
+  OBJECT_DELETED: "OBJECT_DELETED",
+} as const;
+export type ObjectState = typeof OBJECT_STATE[keyof typeof OBJECT_STATE];
+
+// ─── 105. RelationKind (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition RelationKind classifies the container shape of a DLRL
+ *   relation between ObjectRoot instances. Per `dds_dlrl.idl`:
+ *   `enum RelationKind { REF_RELATION, LIST_RELATION, INT_MAP_RELATION,
+ *    STR_MAP_RELATION };`. REF_RELATION — single-target reference;
+ *   LIST_RELATION — ordered list of targets; INT_MAP_RELATION — long-keyed
+ *   map of targets; STR_MAP_RELATION — string-keyed map of targets.
+ * @ownedAttributes (kind enum)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const RELATION_KIND = {
+  REF_RELATION: "REF_RELATION",
+  LIST_RELATION: "LIST_RELATION",
+  INT_MAP_RELATION: "INT_MAP_RELATION",
+  STR_MAP_RELATION: "STR_MAP_RELATION",
+} as const;
+export type RelationKind = typeof RELATION_KIND[keyof typeof RELATION_KIND];
+
+// ─── 106. CriterionKind (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition CriterionKind classifies a SelectionCriterion as either a
+ *   QUERY (predicate evaluated by the underlying SQL-like expression
+ *   engine) or a FILTER (predicate evaluated programmatically by the
+ *   application). Per `dds_dlrl.idl`: `enum CriterionKind { QUERY,
+ *   FILTER };`.
+ * @ownedAttributes (kind enum)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const CRITERION_KIND = {
+  QUERY: "QUERY",
+  FILTER: "FILTER",
+} as const;
+export type CriterionKind =
+  typeof CRITERION_KIND[keyof typeof CRITERION_KIND];
+
+// ─── 107. MembershipState (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition MembershipState reports the membership of an ObjectRoot in a
+ *   FilterCriterion-driven Selection. Per `dds_dlrl.idl`:
+ *   `enum MembershipState { UNDEFINED_MEMBERSHIP, ALREADY_MEMBER,
+ *    NOT_MEMBER };`. UNDEFINED_MEMBERSHIP — first evaluation, prior
+ *   membership unknown; ALREADY_MEMBER — the object was already a member
+ *   on the previous evaluation; NOT_MEMBER — the object was not a member
+ *   on the previous evaluation.
+ * @ownedAttributes (kind enum)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const MEMBERSHIP_STATE = {
+  UNDEFINED_MEMBERSHIP: "UNDEFINED_MEMBERSHIP",
+  ALREADY_MEMBER: "ALREADY_MEMBER",
+  NOT_MEMBER: "NOT_MEMBER",
+} as const;
+export type MembershipState =
+  typeof MEMBERSHIP_STATE[keyof typeof MEMBERSHIP_STATE];
+
+// ─── 108. CacheKind (DLRL kind enum) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass kind-literal
+ * @generalization (root)
+ * @definition CacheKind discriminates a CacheBase between the two concrete
+ *   shapes the DLRL recognizes. Per `dds_dlrl.idl`:
+ *   `enum CacheKind { CACHE_KIND, CACHEACCESS_KIND };`. CACHE_KIND — the
+ *   base is a Cache; CACHEACCESS_KIND — the base is a CacheAccess scoped
+ *   off a parent Cache.
+ * @ownedAttributes (kind enum)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const CACHE_KIND = {
+  CACHE_KIND: "CACHE_KIND",
+  CACHEACCESS_KIND: "CACHEACCESS_KIND",
+} as const;
+export type CacheKindLiteral = typeof CACHE_KIND[keyof typeof CACHE_KIND];
+
+// ─── 109. UNLIMITED_RELATED_OBJECTS (DLRL constant) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass constant
+ * @generalization (root)
+ * @definition UNLIMITED_RELATED_OBJECTS is the DLRL-defined sentinel value
+ *   for an unbounded relation depth. Per `dds_dlrl.idl`:
+ *   `const RelatedObjectDepth UNLIMITED_RELATED_OBJECTS = -1;`.
+ *   Operations that take a `depth` parameter (see Contract.set_depth and
+ *   CacheAccess.create_contract) accept this value to disable the bound.
+ * @ownedAttributes (constant)
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export const UNLIMITED_RELATED_OBJECTS = -1;
+
+// ─── 110. DLRLOid (DLRL value-type) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition DLRLOid is the DLRL object identifier carried by every
+ *   ObjectRoot. Per `dds_dlrl.idl`:
+ *   `struct DLRLOid { DLRL_OID_TYPE_NATIVE value[3]; };`. The native
+ *   implementation type is `long`; the array length 3 is part of the
+ *   contract — every implementation must allocate three slots so that
+ *   the OID is wide enough to remain unique under heavy registration
+ *   load and across long-running deployments.
+ * @ownedAttributes
+ *   value : long[3] — the three-slot identifier
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints
+ *   value.length must equal 3.
+ */
+export interface IDLRLOid {
+  readonly value: readonly [number, number, number];
+}
+
+export class DLRLOid implements IDLRLOid {
+  readonly metaClass = "DLRLOid" as const;
+  readonly value: readonly [number, number, number];
+  constructor(data: { value: readonly [number, number, number] }) {
+    this.value = data.value;
+  }
+}
+
+// ─── 111. DLRLOidGenerator (DLRL singleton-ish utility) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition DLRLOidGenerator is the generator that issues fresh DLRLOid
+ *   values for newly-created ObjectRoot instances. The DLRL spec does not
+ *   prescribe the generator algorithm — implementations are free to use
+ *   monotonically-increasing counters, GUID-like 192-bit space-fillers,
+ *   or vendor-specific schemes — so long as every DLRLOid issued by a
+ *   single generator instance is unique within the scope of the Cache
+ *   that the generator serves.
+ * @ownedAttributes (none)
+ * @associationEnds (none)
+ * @operations
+ *   generate_oid() : DLRLOid
+ * @constraints
+ *   Successive invocations within a single generator instance must return
+ *   DLRLOid values that are unique across that generator's lifetime.
+ */
+export interface IDLRLOidGenerator {
+  generate_oid(): IDLRLOid;
+}
+
+export class DLRLOidGenerator implements IDLRLOidGenerator {
+  readonly metaClass = "DLRLOidGenerator" as const;
+  // Implementation-private monotonic counter — three-slot OID is constructed
+  // by spreading the next integer across the high slot; vendors may
+  // override.
+  private _next = 0;
+  generate_oid(): IDLRLOid {
+    const next = ++this._next;
+    return new DLRLOid({ value: [next, 0, 0] });
+  }
+}
+
+// ─── 112. RelationDescription (DLRL value-type) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition RelationDescription names a DLRL relation that exists on an
+ *   ObjectRoot, together with the kind (REF / LIST / INT_MAP / STR_MAP)
+ *   that classifies its container shape. Per `dds_dlrl.idl`:
+ *   `valuetype RelationDescription { public RelationKind kind; public
+ *    RelationName name; };`. The three concrete subtypes
+ *   (ListRelationDescription, IntMapRelationDescription,
+ *   StrMapRelationDescription) augment the description with the index or
+ *   key that pinpoints a specific element within the relation.
+ * @ownedAttributes
+ *   kind : RelationKind [1]
+ *   name : RelationName (string) [1]
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface IRelationDescription {
+  readonly kind: RelationKind;
+  readonly name: string;
+}
+
+export class RelationDescription implements IRelationDescription {
+  readonly metaClass = "RelationDescription" as const;
+  readonly kind: RelationKind;
+  readonly name: string;
+  constructor(data: { kind: RelationKind; name: string }) {
+    this.kind = data.kind;
+    this.name = data.name;
+  }
+}
+
+// ─── 113. ListRelationDescription (DLRL value-type) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization IRelationDescription
+ * @definition ListRelationDescription is the RelationDescription
+ *   specialization that pinpoints a single element of a list-shaped
+ *   relation by its zero-based ordinal index. Per `dds_dlrl.idl`:
+ *   `valuetype ListRelationDescription : RelationDescription { public
+ *    long index; };`.
+ * @ownedAttributes
+ *   index : long [1] — element ordinal within the list relation
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints
+ *   Inherits kind = LIST_RELATION semantically (caller responsibility).
+ */
+export interface IListRelationDescription extends IRelationDescription {
+  readonly index: number;
+}
+
+export class ListRelationDescription implements IListRelationDescription {
+  readonly metaClass = "ListRelationDescription" as const;
+  readonly kind: RelationKind;
+  readonly name: string;
+  readonly index: number;
+  constructor(data: { kind: RelationKind; name: string; index: number }) {
+    this.kind = data.kind;
+    this.name = data.name;
+    this.index = data.index;
+  }
+}
+
+// ─── 114. IntMapRelationDescription (DLRL value-type) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization IRelationDescription
+ * @definition IntMapRelationDescription is the RelationDescription
+ *   specialization that pinpoints a single element of an integer-keyed
+ *   map relation by its long key. Per `dds_dlrl.idl`:
+ *   `valuetype IntMapRelationDescription : RelationDescription { public
+ *    long key; };`.
+ * @ownedAttributes
+ *   key : long [1] — integer key into the map relation
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints
+ *   Inherits kind = INT_MAP_RELATION semantically (caller responsibility).
+ */
+export interface IIntMapRelationDescription extends IRelationDescription {
+  readonly key: number;
+}
+
+export class IntMapRelationDescription implements IIntMapRelationDescription {
+  readonly metaClass = "IntMapRelationDescription" as const;
+  readonly kind: RelationKind;
+  readonly name: string;
+  readonly key: number;
+  constructor(data: { kind: RelationKind; name: string; key: number }) {
+    this.kind = data.kind;
+    this.name = data.name;
+    this.key = data.key;
+  }
+}
+
+// ─── 115. StrMapRelationDescription (DLRL value-type) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization IRelationDescription
+ * @definition StrMapRelationDescription is the RelationDescription
+ *   specialization that pinpoints a single element of a string-keyed
+ *   map relation by its string key. Per `dds_dlrl.idl`:
+ *   `valuetype StrMapRelationDescription : RelationDescription { public
+ *    string key; };`.
+ * @ownedAttributes
+ *   key : string [1] — string key into the map relation
+ * @associationEnds (none)
+ * @operations (none)
+ * @constraints
+ *   Inherits kind = STR_MAP_RELATION semantically (caller responsibility).
+ */
+export interface IStrMapRelationDescription extends IRelationDescription {
+  readonly key: string;
+}
+
+export class StrMapRelationDescription implements IStrMapRelationDescription {
+  readonly metaClass = "StrMapRelationDescription" as const;
+  readonly kind: RelationKind;
+  readonly name: string;
+  readonly key: string;
+  constructor(data: { kind: RelationKind; name: string; key: string }) {
+    this.kind = data.kind;
+    this.name = data.name;
+    this.key = data.key;
+  }
+}
+
+// ─── 116. ObjectListener (DLRL listener) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition ObjectListener is the root listener interface attached to
+ *   ObjectHome instances to surface object-lifecycle events. Per
+ *   `dds_dlrl.idl`: `local interface ObjectListener { boolean
+ *   on_object_created(in ObjectRoot the_object); boolean
+ *   on_object_deleted(in ObjectRoot the_object); };`. The IDL also
+ *   declares an `on_object_modified` callback in a comment block — its
+ *   typed signature is generated per concrete Foo type, so it appears in
+ *   each derived FooListener and not on the abstract root. The default
+ *   implementation here returns true (event acknowledged) for both
+ *   declared callbacks.
+ * @ownedAttributes (none)
+ * @associationEnds (none)
+ * @operations
+ *   on_object_created(the_object : ObjectRoot) : boolean
+ *   on_object_deleted(the_object : ObjectRoot) : boolean
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface IObjectListener {
+  on_object_created(the_object: IObjectRoot): boolean;
+  on_object_deleted(the_object: IObjectRoot): boolean;
+}
+
+export class ObjectListener implements IObjectListener {
+  readonly metaClass = "ObjectListener" as const;
+  on_object_created(_the_object: IObjectRoot): boolean {
+    // default: NO-OP `nil' listener
+    return true;
+  }
+  on_object_deleted(_the_object: IObjectRoot): boolean {
+    // default: NO-OP `nil' listener
+    return true;
+  }
+}
+
+// ─── 117. SelectionListener (DLRL listener) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition SelectionListener is the root listener interface attached
+ *   to Selection instances to surface object-membership transitions. Per
+ *   `dds_dlrl.idl`: `local interface SelectionListener { void
+ *   on_object_out(in ObjectRoot the_object); };`. The IDL declares
+ *   `on_object_in` and `on_object_modified` in comment blocks — they are
+ *   generated per concrete Foo type in each derived FooSelectionListener
+ *   and therefore do not appear on the abstract root.
+ * @ownedAttributes (none)
+ * @associationEnds (none)
+ * @operations
+ *   on_object_out(the_object : ObjectRoot) : void
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface ISelectionListener {
+  on_object_out(the_object: IObjectRoot): void;
+}
+
+export class SelectionListener implements ISelectionListener {
+  readonly metaClass = "SelectionListener" as const;
+  on_object_out(_the_object: IObjectRoot): void {
+    // default: NO-OP `nil' listener
+  }
+}
+
+// ─── 118. CacheListener (DLRL listener) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition CacheListener is the listener interface attached to Cache
+ *   instances to surface batch-update lifecycle events. Per
+ *   `dds_dlrl.idl`: `local interface CacheListener { void
+ *   on_begin_updates(); void on_end_updates(); void on_updates_enabled();
+ *   void on_updates_disabled(); };`. The four callbacks bracket the
+ *   atomic batches of updates the underlying DCPS layer delivers and the
+ *   on/off transitions of the Cache's `updates_enabled` flag.
+ * @ownedAttributes (none)
+ * @associationEnds (none)
+ * @operations
+ *   on_begin_updates() : void
+ *   on_end_updates() : void
+ *   on_updates_enabled() : void
+ *   on_updates_disabled() : void
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface ICacheListener {
+  on_begin_updates(): void;
+  on_end_updates(): void;
+  on_updates_enabled(): void;
+  on_updates_disabled(): void;
+}
+
+export class CacheListener implements ICacheListener {
+  readonly metaClass = "CacheListener" as const;
+  on_begin_updates(): void {
+    // default: NO-OP
+  }
+  on_end_updates(): void {
+    // default: NO-OP
+  }
+  on_updates_enabled(): void {
+    // default: NO-OP
+  }
+  on_updates_disabled(): void {
+    // default: NO-OP
+  }
+}
+
+// ─── 119. Contract (DLRL clone-control struct) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition Contract is the cloning-control object held by a CacheAccess
+ *   that pinpoints exactly which subgraph of the underlying Cache the
+ *   access scope replicates on every refresh. Per `dds_dlrl.idl`:
+ *   `local interface Contract { readonly attribute long depth; readonly
+ *   attribute ObjectScope scope; readonly attribute ObjectRoot
+ *   contracted_object; void set_depth(in long depth); void set_scope(in
+ *   ObjectScope scope); };`. depth bounds the relation-cascade depth
+ *   (UNLIMITED_RELATED_OBJECTS = -1 lifts the bound). scope picks the
+ *   ObjectScope axis (SIMPLE / CONTAINED / RELATED) along which depth is
+ *   counted. contracted_object is the ObjectRoot anchor.
+ * @ownedAttributes
+ *   depth : long [1]
+ *   scope : ObjectScope [1]
+ *   contracted_object : ObjectRoot [1]
+ * @associationEnds (none)
+ * @operations
+ *   set_depth(depth : long) : void
+ *   set_scope(scope : ObjectScope) : void
+ * @constraints
+ *   depth >= -1 (UNLIMITED_RELATED_OBJECTS).
+ */
+export interface IContract {
+  readonly depth: number;
+  readonly scope: ObjectScope;
+  readonly contracted_object: IObjectRoot;
+  set_depth(depth: number): void;
+  set_scope(scope: ObjectScope): void;
+}
+
+export class Contract implements IContract {
+  readonly metaClass = "Contract" as const;
+  depth: number;
+  scope: ObjectScope;
+  readonly contracted_object: IObjectRoot;
+  constructor(data: {
+    depth: number;
+    scope: ObjectScope;
+    contracted_object: IObjectRoot;
+  }) {
+    this.depth = data.depth;
+    this.scope = data.scope;
+    this.contracted_object = data.contracted_object;
+  }
+  set_depth(depth: number): void {
+    this.depth = depth;
+  }
+  set_scope(scope: ObjectScope): void {
+    this.scope = scope;
+  }
+}
+
+// ─── 120. SelectionCriterion (DLRL filter/query root) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition SelectionCriterion is the abstract root for every predicate
+ *   that drives a Selection. Per `dds_dlrl.idl`: `local interface
+ *   SelectionCriterion { readonly attribute CriterionKind kind; };`.
+ *   A criterion is either a QueryCriterion (SQL-like expression
+ *   evaluated by the engine) or a FilterCriterion (programmatic
+ *   evaluation via a typed check_object callback that the IDL declares
+ *   in a per-Foo-type comment block).
+ * @ownedAttributes
+ *   kind : CriterionKind [1]
+ * @associationEnds (none)
+ * @operations (none — each subtype adds its own)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface ISelectionCriterion {
+  readonly kind: CriterionKind;
+}
+
+// ─── 121. FilterCriterion (DLRL filter) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization ISelectionCriterion
+ * @definition FilterCriterion is the SelectionCriterion specialization
+ *   that evaluates membership programmatically. Per `dds_dlrl.idl`:
+ *   `local interface FilterCriterion : SelectionCriterion {};`. The
+ *   per-Foo `check_object(in ObjectRoot an_object, in MembershipState
+ *   membership_state) : boolean` callback is declared in the IDL inside
+ *   a comment block and is generated per concrete Foo type — therefore
+ *   it does not appear on this abstract surface. kind is hard-bound to
+ *   CRITERION_KIND.FILTER.
+ * @ownedAttributes (none)
+ * @associationEnds (none)
+ * @operations (per-Foo check_object generated downstream)
+ * @constraints
+ *   kind = CRITERION_KIND.FILTER.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IFilterCriterion extends ISelectionCriterion {}
+
+export class FilterCriterion implements IFilterCriterion {
+  readonly metaClass = "FilterCriterion" as const;
+  readonly kind: CriterionKind = CRITERION_KIND.FILTER;
+}
+
+// ─── 122. QueryCriterion (DLRL query) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization ISelectionCriterion
+ * @definition QueryCriterion is the SelectionCriterion specialization
+ *   that evaluates membership via an SQL-like expression. Per
+ *   `dds_dlrl.idl`: `local interface QueryCriterion : SelectionCriterion
+ *   { readonly attribute string expression; readonly attribute
+ *   StringSeq parameters; boolean set_query(in string expression, in
+ *   StringSeq parameters) raises (SQLError); boolean set_parameters(in
+ *   StringSeq parameters) raises (SQLError); };`. kind is hard-bound to
+ *   CRITERION_KIND.QUERY.
+ * @ownedAttributes
+ *   expression : string [1]
+ *   parameters : string[*]
+ * @associationEnds (none)
+ * @operations
+ *   set_query(expression : string, parameters : string[*]) : boolean
+ *   set_parameters(parameters : string[*]) : boolean
+ * @constraints
+ *   kind = CRITERION_KIND.QUERY.
+ */
+export interface IQueryCriterion extends ISelectionCriterion {
+  readonly expression: string;
+  readonly parameters: ReadonlyArray<string>;
+  set_query(expression: string, parameters: ReadonlyArray<string>): boolean;
+  set_parameters(parameters: ReadonlyArray<string>): boolean;
+}
+
+export class QueryCriterion implements IQueryCriterion {
+  readonly metaClass = "QueryCriterion" as const;
+  readonly kind: CriterionKind = CRITERION_KIND.QUERY;
+  expression: string;
+  parameters: ReadonlyArray<string>;
+  constructor(data: {
+    expression: string;
+    parameters: ReadonlyArray<string>;
+  }) {
+    this.expression = data.expression;
+    this.parameters = data.parameters;
+  }
+  set_query(
+    expression: string,
+    parameters: ReadonlyArray<string>
+  ): boolean {
+    this.expression = expression;
+    this.parameters = parameters;
+    return true;
+  }
+  set_parameters(parameters: ReadonlyArray<string>): boolean {
+    this.parameters = parameters;
+    return true;
+  }
+}
+
+// ─── 123. ObjectRoot (DLRL aggregate root) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition ObjectRoot is the root valuetype every shared DLRL object
+ *   inherits from. Per `dds_dlrl.idl`: `valuetype ObjectRoot { private
+ *   DLRLOid m_oid; private ClassName m_class_name; readonly attribute
+ *   DLRLOid oid; readonly attribute ObjectState read_state; readonly
+ *   attribute ObjectState write_state; readonly attribute ObjectHome
+ *   object_home; readonly attribute ClassName class_name; readonly
+ *   attribute CacheBase owner; void destroy() raises
+ *   (PreconditionNotMet); boolean is_modified(in ObjectScope scope);
+ *   RelationDescriptionSeq which_contained_modified(); };`. Every
+ *   typed FooObject is generated as a ObjectRoot subtype with the
+ *   typed ownedAttributes the application declares — those are
+ *   generated on a per-class basis and therefore not present on this
+ *   abstract surface.
+ * @ownedAttributes
+ *   oid : DLRLOid [1]
+ *   read_state : ObjectState [1]
+ *   write_state : ObjectState [1]
+ *   class_name : string [1]
+ * @associationEnds
+ *   object_home : ObjectHome [1]
+ *   owner : CacheBase [1]
+ * @operations
+ *   destroy() : void   raises PreconditionNotMet
+ *   is_modified(scope : ObjectScope) : boolean
+ *   which_contained_modified() : RelationDescription[*]
+ * @constraints
+ *   oid uniqueness within the owning Cache.
+ */
+export interface IObjectRoot {
+  readonly oid: IDLRLOid;
+  readonly read_state: ObjectState;
+  readonly write_state: ObjectState;
+  readonly object_home: IObjectHome;
+  readonly class_name: string;
+  readonly owner: ICacheBase;
+  destroy(): void;
+  is_modified(scope: ObjectScope): boolean;
+  which_contained_modified(): ReadonlyArray<IRelationDescription>;
+}
+
+// ─── 124. ObjectHome (DLRL applicative class representative) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition ObjectHome is the root local interface representing one
+ *   applicative class within the DLRL. Per `dds_dlrl.idl`: `local
+ *   interface ObjectHome { readonly attribute string name; readonly
+ *   attribute string content_filter; readonly attribute ObjectHome
+ *   parent; readonly attribute ObjectHomeSeq children; readonly
+ *   attribute unsigned long registration_index; readonly attribute
+ *   boolean auto_deref; void set_content_filter(in string expression)
+ *   raises (SQLError, PreconditionNotMet); void set_auto_deref(in
+ *   boolean value); void deref_all(); void underef_all(); string
+ *   get_topic_name(in string attribute_name) raises (PreconditionNotMet);
+ *   StringSeq get_all_topic_names() raises (PreconditionNotMet); };`.
+ *   The IDL also declares typed listener-attach, selection-create, and
+ *   object-create operations in comment blocks — these are generated
+ *   per concrete Foo class and therefore do not appear here.
+ * @ownedAttributes
+ *   name : string [1]
+ *   content_filter : string [1]
+ *   registration_index : unsigned long [1]
+ *   auto_deref : boolean [1]
+ * @associationEnds
+ *   parent : ObjectHome [0..1]
+ *   children : ObjectHome[*]
+ * @operations
+ *   set_content_filter(expression : string) : void
+ *   set_auto_deref(value : boolean) : void
+ *   deref_all() : void
+ *   underef_all() : void
+ *   get_topic_name(attribute_name : string) : string
+ *   get_all_topic_names() : string[*]
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface IObjectHome {
+  readonly name: string;
+  readonly content_filter: string;
+  readonly parent: IObjectHome | undefined;
+  readonly children: ReadonlyArray<IObjectHome>;
+  readonly registration_index: number;
+  readonly auto_deref: boolean;
+  set_content_filter(expression: string): void;
+  set_auto_deref(value: boolean): void;
+  deref_all(): void;
+  underef_all(): void;
+  get_topic_name(attribute_name: string): string;
+  get_all_topic_names(): ReadonlyArray<string>;
+}
+
+// ─── 125. Selection (DLRL dynamic subset) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition Selection is the dynamic subset of the objects managed by an
+ *   ObjectHome whose membership is governed by a SelectionCriterion. Per
+ *   `dds_dlrl.idl`: `local interface Selection { readonly attribute
+ *   boolean auto_refresh; readonly attribute boolean concerns_contained;
+ *   void refresh(); };`. Three additional readonly attributes —
+ *   criterion, members, listener — are declared in comment blocks and
+ *   generated per concrete Foo type, therefore not part of the abstract
+ *   surface. The concrete Selection here exposes auto_refresh,
+ *   concerns_contained, and the refresh() operation.
+ * @ownedAttributes
+ *   auto_refresh : boolean [1]
+ *   concerns_contained : boolean [1]
+ * @associationEnds (none — typed criterion / members / listener
+ *   generated per Foo type)
+ * @operations
+ *   refresh() : void
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface ISelection {
+  readonly auto_refresh: boolean;
+  readonly concerns_contained: boolean;
+  refresh(): void;
+}
+
+export class Selection implements ISelection {
+  readonly metaClass = "Selection" as const;
+  readonly auto_refresh: boolean;
+  readonly concerns_contained: boolean;
+  constructor(data: {
+    auto_refresh: boolean;
+    concerns_contained: boolean;
+  }) {
+    this.auto_refresh = data.auto_refresh;
+    this.concerns_contained = data.concerns_contained;
+  }
+  refresh(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+}
+
+// ─── 126. Collection (DLRL relation collection root) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition Collection is the abstract valuetype that all DLRL
+ *   relation-collection valuetypes specialize. Per `dds_dlrl.idl`:
+ *   `abstract valuetype Collection { readonly attribute long length;
+ *   };`. The typed `values` accessor — `readonly attribute
+ *   ObjectRootSeq values;` — is declared in a comment block and
+ *   generated per concrete Foo type.
+ * @ownedAttributes
+ *   length : long [1]
+ * @associationEnds (none)
+ * @operations (none — per-Foo accessors generated downstream)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface ICollection {
+  readonly length: number;
+}
+
+// ─── 127. List (DLRL ordered relation collection) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization ICollection
+ * @definition List is the abstract Collection specialization for
+ *   ordered, integer-indexed relations. Per `dds_dlrl.idl`:
+ *   `abstract valuetype List : Collection { void remove(); LongSeq
+ *   added_elements(); LongSeq removed_elements(); LongSeq
+ *   modified_elements(); };`. Typed add/put/get operations are
+ *   generated per concrete Foo type (declared in IDL comment blocks).
+ * @ownedAttributes (inherits length)
+ * @associationEnds (none)
+ * @operations
+ *   remove() : void
+ *   added_elements() : long[*]
+ *   removed_elements() : long[*]
+ *   modified_elements() : long[*]
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface IList extends ICollection {
+  remove(): void;
+  added_elements(): ReadonlyArray<number>;
+  removed_elements(): ReadonlyArray<number>;
+  modified_elements(): ReadonlyArray<number>;
+}
+
+// ─── 128. Set (DLRL unordered relation collection) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization ICollection
+ * @definition Set is the unordered DLRL relation collection. Per
+ *   `dds_dlrl.idl`: `valuetype Set : Collection { /(*) per-Foo
+ *   added_elements/removed_elements/contains/add/remove generated
+ *   downstream (*)/ };`. The abstract surface inherits length from
+ *   Collection; typed members are produced per concrete Foo type.
+ * @ownedAttributes (inherits length)
+ * @associationEnds (none)
+ * @operations (per-Foo generated)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ISet extends ICollection {}
+
+// ─── 129. StrMap (DLRL string-keyed relation map) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization ICollection
+ * @definition StrMap is the abstract Collection specialization for
+ *   string-keyed relation maps. Per `dds_dlrl.idl`:
+ *   `abstract valuetype StrMap : Collection { readonly attribute
+ *   StringSeq keys; void remove(in string key); StringSeq
+ *   added_elements(); StringSeq removed_elements(); StringSeq
+ *   modified_elements(); };`. Typed put/get operations are
+ *   generated per concrete Foo type.
+ * @ownedAttributes
+ *   keys : string[*]
+ * @associationEnds (none)
+ * @operations
+ *   remove(key : string) : void
+ *   added_elements() : string[*]
+ *   removed_elements() : string[*]
+ *   modified_elements() : string[*]
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface IStrMap extends ICollection {
+  readonly keys: ReadonlyArray<string>;
+  remove(key: string): void;
+  added_elements(): ReadonlyArray<string>;
+  removed_elements(): ReadonlyArray<string>;
+  modified_elements(): ReadonlyArray<string>;
+}
+
+// ─── 130. IntMap (DLRL long-keyed relation map) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization ICollection
+ * @definition IntMap is the abstract Collection specialization for
+ *   long-keyed relation maps. Per `dds_dlrl.idl`:
+ *   `abstract valuetype IntMap : Collection { readonly attribute
+ *   LongSeq keys; void remove(in long key); LongSeq
+ *   added_elements(); LongSeq removed_elements(); LongSeq
+ *   modified_elements(); };`. Typed put/get operations are
+ *   generated per concrete Foo type.
+ * @ownedAttributes
+ *   keys : long[*]
+ * @associationEnds (none)
+ * @operations
+ *   remove(key : long) : void
+ *   added_elements() : long[*]
+ *   removed_elements() : long[*]
+ *   modified_elements() : long[*]
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface IIntMap extends ICollection {
+  readonly keys: ReadonlyArray<number>;
+  remove(key: number): void;
+  added_elements(): ReadonlyArray<number>;
+  removed_elements(): ReadonlyArray<number>;
+  modified_elements(): ReadonlyArray<number>;
+}
+
+// ─── 131. CacheBase (DLRL cache hierarchy root) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass abstract
+ * @generalization (root)
+ * @definition CacheBase is the root local interface for both Cache and
+ *   CacheAccess. Per `dds_dlrl.idl`: `local interface CacheBase {
+ *   readonly attribute CacheUsage cache_usage; readonly attribute
+ *   ObjectRootSeq objects; readonly attribute CacheKind kind; void
+ *   refresh() raises (DCPSError); };`. cache_usage gives the read /
+ *   write / read-write purpose; kind discriminates a cache instance
+ *   between CACHE_KIND and CACHEACCESS_KIND. refresh forces a
+ *   synchronous reconcile against the underlying DCPS layer.
+ * @ownedAttributes
+ *   cache_usage : CacheUsage [1]
+ *   kind : CacheKind [1]
+ * @associationEnds
+ *   objects : ObjectRoot[*]
+ * @operations
+ *   refresh() : void   raises DCPSError
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface ICacheBase {
+  readonly cache_usage: CacheUsage;
+  readonly objects: ReadonlyArray<IObjectRoot>;
+  readonly kind: CacheKindLiteral;
+  refresh(): void;
+}
+
+// ─── 132. CacheAccess (DLRL access scope on a Cache) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization ICacheBase
+ * @definition CacheAccess is the local interface that scopes access to a
+ *   subset of a Cache's objects, cloned on every refresh. Per
+ *   `dds_dlrl.idl`: `local interface CacheAccess : CacheBase { readonly
+ *   attribute Cache owner; readonly attribute ContractSeq contracts;
+ *   readonly attribute StringSeq type_names; void write() raises
+ *   (ReadOnlyMode, DCPSError); void purge(); void create_contract(in
+ *   ObjectRoot object, in ObjectScope scope, in long depth) raises
+ *   (PreconditionNotMet); void delete_contract(in Contract a_contract)
+ *   raises (PreconditionNotMet); };`. owner is the parent Cache;
+ *   contracts is the set of clone-control objects active on the access.
+ *   kind is hard-bound to CACHE_KIND.CACHEACCESS_KIND.
+ * @ownedAttributes
+ *   type_names : string[*]
+ * @associationEnds
+ *   owner : Cache [1]
+ *   contracts : Contract[*]
+ * @operations
+ *   write() : void   raises ReadOnlyMode, DCPSError
+ *   purge() : void
+ *   create_contract(object : ObjectRoot, scope : ObjectScope, depth : long) : void
+ *   delete_contract(a_contract : Contract) : void
+ * @constraints
+ *   kind = CACHE_KIND.CACHEACCESS_KIND.
+ */
+export interface ICacheAccess extends ICacheBase {
+  readonly owner: ICache;
+  readonly contracts: ReadonlyArray<IContract>;
+  readonly type_names: ReadonlyArray<string>;
+  write(): void;
+  purge(): void;
+  create_contract(
+    object: IObjectRoot,
+    scope: ObjectScope,
+    depth: number
+  ): void;
+  delete_contract(a_contract: IContract): void;
+}
+
+export class CacheAccess implements ICacheAccess {
+  readonly metaClass = "CacheAccess" as const;
+  readonly cache_usage: CacheUsage;
+  readonly objects: ReadonlyArray<IObjectRoot>;
+  readonly kind: CacheKindLiteral = CACHE_KIND.CACHEACCESS_KIND;
+  readonly owner: ICache;
+  readonly contracts: ReadonlyArray<IContract>;
+  readonly type_names: ReadonlyArray<string>;
+  constructor(data: {
+    cache_usage: CacheUsage;
+    objects: ReadonlyArray<IObjectRoot>;
+    owner: ICache;
+    contracts?: ReadonlyArray<IContract>;
+    type_names?: ReadonlyArray<string>;
+  }) {
+    this.cache_usage = data.cache_usage;
+    this.objects = data.objects;
+    this.owner = data.owner;
+    this.contracts = data.contracts ?? [];
+    this.type_names = data.type_names ?? [];
+  }
+  refresh(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  write(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  purge(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  create_contract(
+    _object: IObjectRoot,
+    _scope: ObjectScope,
+    _depth: number
+  ): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  delete_contract(_a_contract: IContract): void {
+    // default: NO-OP — concrete vendors implement
+  }
+}
+
+// ─── 133. Cache (DLRL root cache) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization ICacheBase
+ * @definition Cache is the local interface that manages a set of related
+ *   DLRL objects, tied to one DDS::Publisher and/or one DDS::Subscriber.
+ *   Per `dds_dlrl.idl`: `local interface Cache : CacheBase { readonly
+ *   attribute DCPSState pubsub_state; readonly attribute DDS::Publisher
+ *   the_publisher; readonly attribute DDS::Subscriber the_subscriber;
+ *   readonly attribute boolean updates_enabled; readonly attribute
+ *   ObjectHomeSeq homes; readonly attribute CacheAccessSeq sub_accesses;
+ *   readonly attribute CacheListenerSeq listeners; void
+ *   register_all_for_pubsub() raises (BadHomeDefinition, DCPSError,
+ *   PreconditionNotMet); void enable_all_for_pubsub() raises (DCPSError,
+ *   PreconditionNotMet); unsigned long register_home(in ObjectHome
+ *   a_home) raises (PreconditionNotMet); ObjectHome find_home_by_name(in
+ *   ClassName class_name); ObjectHome find_home_by_index(in unsigned
+ *   long index); void attach_listener(in CacheListener listener); void
+ *   detach_listener(in CacheListener listener); void enable_updates();
+ *   void disable_updates(); CacheAccess create_access(in CacheUsage
+ *   purpose) raises (PreconditionNotMet); void delete_access(in
+ *   CacheAccess access) raises (PreconditionNotMet); };`. kind is
+ *   hard-bound to CACHE_KIND.CACHE_KIND.
+ * @ownedAttributes
+ *   pubsub_state : DCPSState [1]
+ *   updates_enabled : boolean [1]
+ * @associationEnds
+ *   the_publisher : Publisher [0..1]
+ *   the_subscriber : Subscriber [0..1]
+ *   homes : ObjectHome[*]
+ *   sub_accesses : CacheAccess[*]
+ *   listeners : CacheListener[*]
+ * @operations
+ *   register_all_for_pubsub() : void   raises BadHomeDefinition, DCPSError, PreconditionNotMet
+ *   enable_all_for_pubsub() : void     raises DCPSError, PreconditionNotMet
+ *   register_home(a_home : ObjectHome) : unsigned long
+ *   find_home_by_name(class_name : ClassName) : ObjectHome
+ *   find_home_by_index(index : unsigned long) : ObjectHome
+ *   attach_listener(listener : CacheListener) : void
+ *   detach_listener(listener : CacheListener) : void
+ *   enable_updates() : void
+ *   disable_updates() : void
+ *   create_access(purpose : CacheUsage) : CacheAccess
+ *   delete_access(access : CacheAccess) : void
+ * @constraints
+ *   kind = CACHE_KIND.CACHE_KIND.
+ */
+export interface ICache extends ICacheBase {
+  readonly pubsub_state: DCPSState;
+  readonly the_publisher: IPublisher | undefined;
+  readonly the_subscriber: ISubscriber | undefined;
+  readonly updates_enabled: boolean;
+  readonly homes: ReadonlyArray<IObjectHome>;
+  readonly sub_accesses: ReadonlyArray<ICacheAccess>;
+  readonly listeners: ReadonlyArray<ICacheListener>;
+  register_all_for_pubsub(): void;
+  enable_all_for_pubsub(): void;
+  register_home(a_home: IObjectHome): number;
+  find_home_by_name(class_name: string): IObjectHome | undefined;
+  find_home_by_index(index: number): IObjectHome | undefined;
+  attach_listener(listener: ICacheListener): void;
+  detach_listener(listener: ICacheListener): void;
+  enable_updates(): void;
+  disable_updates(): void;
+  create_access(purpose: CacheUsage): ICacheAccess;
+  delete_access(access: ICacheAccess): void;
+}
+
+export class Cache implements ICache {
+  readonly metaClass = "Cache" as const;
+  readonly cache_usage: CacheUsage;
+  readonly objects: ReadonlyArray<IObjectRoot>;
+  readonly kind: CacheKindLiteral = CACHE_KIND.CACHE_KIND;
+  readonly pubsub_state: DCPSState;
+  readonly the_publisher: IPublisher | undefined;
+  readonly the_subscriber: ISubscriber | undefined;
+  readonly updates_enabled: boolean;
+  readonly homes: ReadonlyArray<IObjectHome>;
+  readonly sub_accesses: ReadonlyArray<ICacheAccess>;
+  readonly listeners: ReadonlyArray<ICacheListener>;
+  constructor(data: {
+    cache_usage: CacheUsage;
+    objects?: ReadonlyArray<IObjectRoot>;
+    pubsub_state: DCPSState;
+    the_publisher?: IPublisher;
+    the_subscriber?: ISubscriber;
+    updates_enabled: boolean;
+    homes?: ReadonlyArray<IObjectHome>;
+    sub_accesses?: ReadonlyArray<ICacheAccess>;
+    listeners?: ReadonlyArray<ICacheListener>;
+  }) {
+    this.cache_usage = data.cache_usage;
+    this.objects = data.objects ?? [];
+    this.pubsub_state = data.pubsub_state;
+    this.the_publisher = data.the_publisher;
+    this.the_subscriber = data.the_subscriber;
+    this.updates_enabled = data.updates_enabled;
+    this.homes = data.homes ?? [];
+    this.sub_accesses = data.sub_accesses ?? [];
+    this.listeners = data.listeners ?? [];
+  }
+  refresh(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  register_all_for_pubsub(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  enable_all_for_pubsub(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  register_home(_a_home: IObjectHome): number {
+    // default: returns 0 — concrete vendors track registration_index
+    return 0;
+  }
+  find_home_by_name(_class_name: string): IObjectHome | undefined {
+    // default: NO-OP — concrete vendors implement
+    return undefined;
+  }
+  find_home_by_index(_index: number): IObjectHome | undefined {
+    // default: NO-OP — concrete vendors implement
+    return undefined;
+  }
+  attach_listener(_listener: ICacheListener): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  detach_listener(_listener: ICacheListener): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  enable_updates(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  disable_updates(): void {
+    // default: NO-OP — concrete vendors implement
+  }
+  create_access(purpose: CacheUsage): ICacheAccess {
+    // default: minimal CacheAccess scaffold — concrete vendors override
+    return new CacheAccess({
+      cache_usage: purpose,
+      objects: [],
+      owner: this,
+    });
+  }
+  delete_access(_access: ICacheAccess): void {
+    // default: NO-OP — concrete vendors implement
+  }
+}
+
+// ─── 134. CacheDescription (DLRL value-type carrier) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition CacheDescription is the value-type carrier passed to
+ *   CacheFactory.create_cache to describe the Cache to be instantiated.
+ *   Per `dds_dlrl.idl`: `valuetype CacheDescription { public CacheName
+ *   name; public DDS::DomainParticipant domain; };`. name is the
+ *   directory-like identifier under which the Cache is registered with
+ *   the factory; domain is the DCPS DomainParticipant the Cache is
+ *   wired to.
+ * @ownedAttributes
+ *   name : string [1]
+ * @associationEnds
+ *   domain : DomainParticipant [1]
+ * @operations (none)
+ * @constraints (none declared in dds_dlrl.idl)
+ */
+export interface ICacheDescription {
+  readonly name: string;
+  readonly domain: IDomainParticipant;
+}
+
+export class CacheDescription implements ICacheDescription {
+  readonly metaClass = "CacheDescription" as const;
+  readonly name: string;
+  readonly domain: IDomainParticipant;
+  constructor(data: { name: string; domain: IDomainParticipant }) {
+    this.name = data.name;
+    this.domain = data.domain;
+  }
+}
+
+// ─── 135. CacheFactory (DLRL singleton factory) ───
+/**
+ * @standard OMG DDS 1.4 -- formal/2015-04-10
+ * @section §?
+ * @metaclass concrete
+ * @generalization (root)
+ * @definition CacheFactory is the singleton local interface that creates,
+ *   looks up, and deletes Cache instances. Per `dds_dlrl.idl`:
+ *   `local interface CacheFactory { Cache create_cache(in CacheUsage
+ *   cache_usage, in CacheDescription cache_description) raises
+ *   (DCPSError, AlreadyExisting); Cache find_cache_by_name(in CacheName
+ *   name); void delete_cache(in Cache a_cache); };`.
+ * @ownedAttributes (none)
+ * @associationEnds (none — singleton)
+ * @operations
+ *   create_cache(cache_usage : CacheUsage, cache_description : CacheDescription) : Cache
+ *   find_cache_by_name(name : string) : Cache
+ *   delete_cache(a_cache : Cache) : void
+ * @constraints
+ *   create_cache MAY raise AlreadyExisting if a Cache by the same name
+ *   exists.
+ */
+export interface ICacheFactory {
+  create_cache(
+    cache_usage: CacheUsage,
+    cache_description: ICacheDescription
+  ): ICache;
+  find_cache_by_name(name: string): ICache | undefined;
+  delete_cache(a_cache: ICache): void;
+}
+
+export class CacheFactory implements ICacheFactory {
+  readonly metaClass = "CacheFactory" as const;
+  private _caches = new Map<string, ICache>();
+  create_cache(
+    cache_usage: CacheUsage,
+    cache_description: ICacheDescription
+  ): ICache {
+    const cache = new Cache({
+      cache_usage,
+      pubsub_state: DCPS_STATE.INITIAL,
+      updates_enabled: false,
+    });
+    this._caches.set(cache_description.name, cache);
+    return cache;
+  }
+  find_cache_by_name(name: string): ICache | undefined {
+    return this._caches.get(name);
+  }
+  delete_cache(a_cache: ICache): void {
+    for (const [name, c] of this._caches.entries()) {
+      if (c === a_cache) {
+        this._caches.delete(name);
+        return;
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// — END Implementer #5: DLRL + index barrel —
+//
+// Inventory inserted in this section (DLRL — `spec/dds_dlrl.idl`):
+//   • Kind enums (8): ReferenceScope, ObjectScope, DCPSState, CacheUsage,
+//     ObjectState, RelationKind, CriterionKind, MembershipState, CacheKind
+//   • Constants (1): UNLIMITED_RELATED_OBJECTS
+//   • Carriers (5): DLRLOid, DLRLOidGenerator, RelationDescription
+//     (+ 3 children: ListRelationDescription, IntMapRelationDescription,
+//     StrMapRelationDescription), CacheDescription
+//   • Listeners (3): ObjectListener, SelectionListener, CacheListener
+//   • Selection criteria (3): SelectionCriterion (abstract),
+//     FilterCriterion, QueryCriterion
+//   • Contract (1): Contract
+//   • Aggregate roots (3 abstract surfaces): ObjectRoot, ObjectHome,
+//     Selection (concrete with NO-OP refresh)
+//   • Collections (5): Collection (abstract), List (abstract), Set,
+//     StrMap (abstract), IntMap (abstract)
+//   • Cache hierarchy (3): CacheBase (abstract), CacheAccess, Cache
+//   • Factory (1): CacheFactory
+//
+// Total DLRL metaclass count: 28 (8 kind enums + 1 constant + 5 carriers
+// + 3 listeners + 3 criteria + 1 Contract + 3 aggregate-root surfaces +
+// 5 collections + 3 cache hierarchy + 1 factory − 1 abstract Collection
+// already counted). Per dds_dlrl.idl, the abstract surfaces (ObjectRoot,
+// ObjectHome, Collection, List, StrMap, IntMap, CacheBase,
+// SelectionCriterion) are interface-only — concrete subtypes are
+// generated per applicative class downstream and surfaced as IDL-level
+// FooObject / FooHome / FooSet / FooSelection / FooFilterCriterion etc.
+// They are therefore exported from this metamodel as interfaces only.
+//
+// Spec ambiguity flagged in this partition:
+//   • The DDS 1.4 specification (formal/2015-04-10) does not include a
+//     numbered §2.3.x DLRL chapter. The DLRL specification was a
+//     separately maintained sub-spec from DDS 1.0/1.1/1.2 that was
+//     dropped in DDS 1.4. The IDL artifact `spec/dds_dlrl.idl` is the
+//     authoritative source for this implementer; every metaclass
+//     declaration above carries `@section §?` to flag this scope
+//     mismatch with the partition brief. Downstream readers should
+//     consult `dds_dlrl.idl` directly + the OMG DLRL formal sub-spec for
+//     normative semantics.
+//   • The brief enumerated DLRL members "ListRelation, MapRelation,
+//     StringMapRelation, RefRelation". `dds_dlrl.idl` declares
+//     RelationDescription (root) and three children
+//     (ListRelationDescription, IntMapRelationDescription,
+//     StrMapRelationDescription) — descriptors of relations rather than
+//     relations themselves. The relations themselves surface as the
+//     Collection / List / Set / StrMap / IntMap valuetype family and are
+//     generated per concrete Foo type. Both the descriptors and the
+//     collection valuetypes have been exported above. RefRelation
+//     specifically does not appear as a separate IDL valuetype — a
+//     reference relation is a single-target relation surfaced through
+//     the per-Foo generated accessor with kind = REF_RELATION; the
+//     descriptor RelationDescription with kind = REF_RELATION is
+//     therefore the meta-surface of "RefRelation". @section §?
+//   • The brief enumerated DLRL members "DLRLListener" + "HomeListener".
+//     `dds_dlrl.idl` declares only three listener roots — ObjectListener
+//     (attached to ObjectHome), SelectionListener, CacheListener —
+//     with no DLRLListener marker root and no separate HomeListener.
+//     ObjectListener IS the listener attached to ObjectHome instances.
+//     @section §?
+//   • The brief enumerated "FunctionalRequest, MultiObjectFilter".
+//     `dds_dlrl.idl` does not declare these IDL types. They appear to
+//     belong to extension proposals or vendor-specific DLRL refinements
+//     and have therefore been omitted. @section §?
+//
+// End of Implementer #5 partition.
+// ═══════════════════════════════════════════════════════════════════════════
